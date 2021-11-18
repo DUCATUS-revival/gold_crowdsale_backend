@@ -1,0 +1,5 @@
+root_keys:
+    btc:
+      - 123
+    eth:
+      - 456
