@@ -4,14 +4,38 @@ from rest_framework import views
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 
 from gold_crowdsale.accounts.models import BlockchainAccount
+from gold_crowdsale.accounts.serializers import BlockchainAccountSerializer
 
 from .models import TokenPurchase
-from .serrializers import TokenPurchaseSerializer
+from .serializers import TokenPurchaseSerializer
 
 
 class TokenPurchaseView(APIView):
+    @swagger_auto_schema(
+        operation_description="post ducx address and get addresses for payment",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['user_address'],
+            properties={
+                'user_address': openapi.Schema(type=openapi.TYPE_STRING),
+            },
+        ),
+        responses={201: openapi.Response(
+            description='Response with payment addresses',
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'user_address': openapi.Schema(type=openapi.TYPE_STRING),
+                    'payment_addresses': openapi.Schema(type=openapi.TYPE_STRING),
+                    'eth_address': openapi.Schema(type=openapi.TYPE_STRING),
+                },
+            )
+        )},
+    )
     def post(self, request, *args, **kwargs):
         user_address = request.data.get('user_address')
 
@@ -31,14 +55,16 @@ class TokenPurchaseView(APIView):
             payment_account.generate_keys()
             payment_account.save()
 
-        purchase_request = TokenPurchase.objects.create(
+        payment_account_serialized = BlockchainAccountSerializer(payment_account)
+
+        TokenPurchase.objects.create(
             user_address=user_address,
             payment_addresses=payment_account
         )
 
-        serializer = TokenPurchaseSerializer(purchase_request)
+        payment_account.set_receiving()
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(payment_account_serialized.data, status=status.HTTP_201_CREATED)
 
 
 

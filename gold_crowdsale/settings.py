@@ -41,7 +41,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'drf_yasg',
+    'django_extensions',
     'gold_crowdsale.accounts',
+    'gold_crowdsale.purchases',
 ]
 
 MIDDLEWARE = [
@@ -138,6 +141,8 @@ USE_X_FORWARDED_HOST = True
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+SHELL_PLUS = 'ptpython'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 
@@ -147,3 +152,4 @@ with open(os.path.dirname(__file__) + '/../config.yaml') as f:
     config_data = yaml.safe_load(f)
 
 ROOT_KEYS = config_data.get('root_keys', None)
+
