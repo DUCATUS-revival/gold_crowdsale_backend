@@ -138,7 +138,12 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-config.yaml
-.docker
-static
 .idea
+.docker
+*/*/migrations/
+
+config.yaml
+static
+
+scanner/settings/config.py
+scanner/block/numbers/

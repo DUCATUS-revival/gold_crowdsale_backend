@@ -5,12 +5,14 @@ services:
     env_file: .env
     volumes:
       - ./.docker/postgres-data:/var/lib/postgresql/data
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    environment:
-      RABBITMQ_DEFAULT_USER:
-      RABBITMQ_DEFAULT_PASS:
-      RABBITMQ_DEFAULT_VHOST:
+    ports:
+      - 5432:5432
+#  rabbitmq:
+#    image: rabbitmq:3-management-alpine
+#    environment:
+#      RABBITMQ_DEFAULT_USER:
+#      RABBITMQ_DEFAULT_PASS:
+#      RABBITMQ_DEFAULT_VHOST:
 #    ports:
 #      - 5672:5672
 #      - 15672:15672
@@ -23,9 +25,22 @@ services:
       - "${DJANGO_PORT}:8000"
     depends_on:
       - db
-      - rabbitmq
-#     volumes:
-#      - ./DucatusXAA/exchanges:/code/DucatusXAA/exchanges
-#      - ./DucatusXAA/rates:/code/DucatusXAA/rates
-#      - ./DucatusXAA/transfers:/code/DucatusXAA/transfers
-#      - ./DucatusXAA/withdrawals:/code/DucatusXAA/withdrawals
+      # - rabbitmq
+    volumes:
+      - ./gold_crowdsale/accounts:/code/gold_crowdsale/accounts
+      - ./gold_crowdsale/purchases:/code/gold_crowdsale/purchases
+    command: bash -c "python manage.py makemigrations && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+  scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+#    ports:
+#      - "${DJANGO_PORT}:8000"
+    depends_on:
+      - db
+      # - rabbitmq
+    volumes:
+      - ./scanner/settings:/code/scanner/settings
+      - ./scanner/block_numbers:/code/scanner/block_numbers
+    command: bash -c "python scanner/main.py"

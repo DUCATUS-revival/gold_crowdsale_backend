@@ -1,4 +1,0 @@
-[submodule "scanner"]
-	path = scanner
-	url = https://github.com/MyWishPlatform/mywill_scanner.git
-	branch = feature/ducatusscanner
