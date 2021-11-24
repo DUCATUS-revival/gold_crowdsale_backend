@@ -145,5 +145,5 @@ cython_debug/
 config.yaml
 static
 
-scanner/settings/config.py
-scanner/block/numbers/
+scanner/settings/config.yaml
+scanner/block_numbers/

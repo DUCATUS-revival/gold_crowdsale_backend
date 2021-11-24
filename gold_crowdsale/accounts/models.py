@@ -25,8 +25,8 @@ class BlockchainAccount(models.Model):
 
         child_key = bip32_key.ChildKey(self.id)
 
-        self.eth_address = child_key.Address()
-        self.btc_address = keys.PublicKey(child_key.K.to_string()).to_checksum_address().lower()
+        self.btc_address = child_key.Address()
+        self.eth_address = keys.PublicKey(child_key.K.to_string()).to_checksum_address().lower()
 
         self.save()
 

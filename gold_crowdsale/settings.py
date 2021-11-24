@@ -152,4 +152,5 @@ with open(os.path.dirname(__file__) + '/../config.yaml') as f:
     config_data = yaml.safe_load(f)
 
 ROOT_KEYS = config_data.get('root_keys', None)
+NETWORKS = config_data.get('networks', None)
 

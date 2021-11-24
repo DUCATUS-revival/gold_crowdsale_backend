@@ -1,5 +1,5 @@
 import json
-
+import os
 import pika
 
 from settings import CONFIG
@@ -25,13 +25,15 @@ class BaseMonitor:
 
     def send_to_backend(self, message: dict):
         connection = pika.BlockingConnection(pika.ConnectionParameters(
-            CONFIG['rabbit']['host'],
+            'rabbitmq',
             5672,
-            CONFIG['rabbit']['vhost'],
-            pika.PlainCredentials(CONFIG['rabbit']['username'], CONFIG['rabbit']['password']),
+            os.getenv('RABBITMQ_DEFAULT_VHOST', 'gold_crowdsale'),
+            pika.PlainCredentials(os.getenv('RABBITMQ_DEFAULT_USER', 'gold_crowdsale'),
+                                  os.getenv('RABBITMQ_DEFAULT_PASS', 'gold_crowdsale')),
             heartbeat=3600,
             blocked_connection_timeout=3600
-            ))
+        ))
+
         channel = connection.channel()
         channel.queue_declare(queue=self.queue, durable=True, auto_delete=False,
                               exclusive=False)
