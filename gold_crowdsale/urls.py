@@ -20,6 +20,7 @@ from drf_yasg import openapi
 from rest_framework import permissions
 
 from gold_crowdsale.purchases.views import TokenPurchaseView
+from gold_crowdsale.rates.views import UsdRateView
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -36,6 +37,7 @@ urlpatterns = [
     path('django-admin/', admin.site.urls),
     path('api/v1/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('api/v1/purchases/', TokenPurchaseView.as_view()),
+    path('api/v1/usd_rates/', UsdRateView.as_view()),
 
 
 ]

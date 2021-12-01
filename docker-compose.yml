@@ -28,9 +28,12 @@ services:
       - db
       # - rabbitmq
     volumes:
-      - ./gold_crowdsale/accounts:/code/gold_crowdsale/accounts
-      - ./gold_crowdsale/purchases:/code/gold_crowdsale/purchases
-    command: bash -c "python manage.py makemigrations && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+      - .:/code
+#      - ./gold_crowdsale/accounts:/code/gold_crowdsale/accounts
+#      - ./gold_crowdsale/purchases:/code/gold_crowdsale/purchases
+#      - ./gold_crowdsale/transfers:/code/gold_crowdsale/transfers
+#      - ./gold_crowdsale/rates:/code/gold_crowdsale/rates
+    command: bash -c "python manage.py runserver 0.0.0.0:8000"
   scanner:
     build:
       context: .
@@ -42,7 +45,7 @@ services:
     volumes:
       - ./scanner/settings:/code/scanner/settings
       - ./scanner/block_numbers:/code/scanner/block_numbers
-    command: bash -c './wait-for-it.sh rabbitmq:5672 -- python scanner/main.py'
+    command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python scanner/main.py'
   receiver:
     build:
       context: .
@@ -53,7 +56,23 @@ services:
     depends_on:
       - db
       - rabbitmq
-    command: bash -c './wait-for-it.sh rabbitmq:5672 -- python receiver.py'
+    command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python receiver.py'
+  redis:
+    container_name: redis-mq
+    restart: always
+    image: redis:alpine
+  dramatiq:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+      # - web
+    # restart: unless-stopped
+    command: bash -c './wait-for-it.sh -t 60 redis:6379 -- python manage.py rundramatiq'
 
 #  elasticsearch:
 #    image: "docker.elastic.co/elasticsearch/elasticsearch:7.2.0"
@@ -65,10 +84,12 @@ services:
 #      - "${ELASTICSEARCH_PORT}:9200"
 #    volumes:
 #      - ./.docker/elasticsearch_data:/usr/share/elasticsearch/data
+#
 #  kibana:
 #    image: "docker.elastic.co/kibana/kibana:7.2.0"
 #    ports:
 #      - "${KIBANA_PORT}:5601"
+#
 #  filebeat:
 #    image: "docker.elastic.co/beats/filebeat:7.2.0"
 #    user: root

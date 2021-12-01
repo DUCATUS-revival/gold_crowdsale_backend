@@ -45,6 +45,9 @@ INSTALLED_APPS = [
     'django_extensions',
     'gold_crowdsale.accounts',
     'gold_crowdsale.purchases',
+    'gold_crowdsale.payments',
+    'gold_crowdsale.transfers',
+    'gold_crowdsale.rates',
 ]
 
 MIDDLEWARE = [
@@ -127,7 +130,6 @@ USE_L10N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 
@@ -137,9 +139,32 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 CORS_ORIGIN_ALLOW_ALL = True
 
+# Enable SSL
 USE_X_FORWARDED_HOST = True
-
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Enable logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'console': {
+            'format': '%(asctime)s %(levelname)s [%(name)s:%(lineno)s] %(module)s %(process)d %(thread)d | %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'console',
+        },
+    },
+    'loggers': {
+        '': {
+            'level': 'INFO',
+            'handlers': ['console'],
+        },
+    },
+}
 
 SHELL_PLUS = 'ptpython'
 
@@ -148,9 +173,29 @@ SHELL_PLUS = 'ptpython'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+MAX_AMOUNT_LEN = len(str(2 ** 256))
+
+DECIMALS = {
+    'ETH': 10 ** 18,
+    'BTC': 10 ** 8,
+    'DUC': 10 ** 8,
+    'DUCX': 10 ** 18,
+    'USDC': 10 ** 6,
+    'USDT': 10 ** 6,
+    'USD': 10 ** 2,
+    'GOLD': 10 ** 18
+}
+
 with open(os.path.dirname(__file__) + '/../config.yaml') as f:
     config_data = yaml.safe_load(f)
 
 ROOT_KEYS = config_data.get('root_keys', None)
 NETWORKS = config_data.get('networks', None)
+GOLD_TOKEN_ADDRESS = config_data.get('gold_token_address', None)
+RATES_SETTINGS = config_data.get('rates_settings', None)
 
+RELAYING_NETWORK = None
+
+for net, value in NETWORKS.items():
+    if value.get('is_relaying'):
+        RELAYING_NETWORK = value

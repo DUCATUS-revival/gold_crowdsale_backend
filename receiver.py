@@ -13,7 +13,8 @@ django.setup()
 
 from django.core.exceptions import ObjectDoesNotExist
 from gold_crowdsale.settings import NETWORKS
-# from gold_crowdsale.payments.api import parse_payment_message
+from gold_crowdsale.payments.api import parse_payment_message
+from gold_crowdsale.transfers.models import parse_transfer_confirmation
 
 
 class Receiver(threading.Thread):
@@ -57,11 +58,11 @@ class Receiver(threading.Thread):
 
     def payment(self, message):
         print('RECEIVER: payment message received', flush=True)
-        # parse_payment_message(message)
+        parse_payment_message(message)
 
     def transferred(self, message):
         print('TRANSFER CONFIRMATION RECEIVED', flush=True)
-        #confirm_transfer(message)
+        parse_transfer_confirmation(message)
 
     def callback(self, ch, method, properties, body):
         print('RECEIVER: received', body, properties, method, flush=True)

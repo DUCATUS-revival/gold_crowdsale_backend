@@ -30,4 +30,6 @@ ps:
 logs:
 	$(compose) logs -f $(service)
 
+remove_migrations:
+	bash -c "for file in $$(find gold_crowdsale -name 000*); do sudo rm -rf $$file; done"
 

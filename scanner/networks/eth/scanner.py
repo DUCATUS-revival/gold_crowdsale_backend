@@ -1,3 +1,5 @@
+import sys
+import traceback
 import collections
 from pubsub import pub
 from web3.exceptions import LogTopicError
@@ -23,7 +25,9 @@ class EthScanner(Scanner):
         try:
             pub.sendMessage(self.network.type, block_event=block_event)
         except Exception as e:
-            print(e)
+            print('PUB ERROR:', e)
+            print(block_event.__dict__)
+            print('\n'.join(traceback.format_exception(*sys.exc_info())))
 
     def _check_tx_from(self, tx, addresses):
         from_address = tx.inputs[0]

@@ -9,6 +9,6 @@ engine = create_engine(CONFIG['db']['url'])
 Base.prepare(engine, reflect=True)
 
 BlockchainAccount = Base.classes.accounts_blockchainaccount
-# Transfers = Base.classes.transfers_
+Transfers = Base.classes.transfers_tokentransfer
 
 session = Session(engine)
