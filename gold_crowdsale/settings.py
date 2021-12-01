@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_yasg',
     'django_extensions',
+    'django_dramatiq',
     'gold_crowdsale.accounts',
     'gold_crowdsale.purchases',
     'gold_crowdsale.payments',
@@ -95,6 +96,25 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+DRAMATIQ_BROKER = {
+    "BROKER": "dramatiq.brokers.rabbitmq.RabbitmqBroker",
+    "OPTIONS": {
+        "url": "amqp://gold_crowdsale:gold_crowdsale@rabbitmq:5672/gold_crowdsale",
+    },
+    "MIDDLEWARE": [
+        "dramatiq.middleware.Prometheus",
+        "dramatiq.middleware.AgeLimit",
+        "dramatiq.middleware.TimeLimit",
+        "dramatiq.middleware.Callbacks",
+        "dramatiq.middleware.Retries",
+        "django_dramatiq.middleware.DbConnectionsMiddleware",
+        "django_dramatiq.middleware.AdminMiddleware",
+    ]
+}
+# Defines which database should be used to persist Task objects when the
+# AdminMiddleware is enabled.  The default value is "default".
+DRAMATIQ_TASKS_DATABASE = "default"
 
 
 
@@ -195,7 +215,8 @@ GOLD_TOKEN_ADDRESS = config_data.get('gold_token_address', None)
 RATES_SETTINGS = config_data.get('rates_settings', None)
 
 RELAYING_NETWORK = None
-
 for net, value in NETWORKS.items():
     if value.get('is_relaying'):
         RELAYING_NETWORK = value
+
+SCHEDULER_SETTINGS = config_data.get('scheduler_settings', None)

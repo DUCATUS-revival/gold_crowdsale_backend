@@ -30,7 +30,7 @@ def create_transfer(token_purchase):
         if not rate_object:
             raise UsdRate.DoesNotExist()
     except UsdRate.DoesNotExist:
-        raise Exception('CREATING TRANSFER ERROR: you should run rates_checker.py at least once')
+        raise Exception('CREATING TRANSFER ERROR: database does not have saved rates, check scheduler')
 
     usd_rate = getattr(rate_object, token_purchase.payment.currency)
     gold_rate = rate_object.GOLD

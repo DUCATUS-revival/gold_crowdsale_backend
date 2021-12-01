@@ -2,22 +2,25 @@ version: "3.8"
 services:
   db:
     image: postgres:13.4
+    restart: unless-stopped
     env_file: .env
     volumes:
       - ./.docker/postgres-data:/var/lib/postgresql/data
-    ports:
-      - 5432:5432
+#    ports:
+#      - 5432:5432
   rabbitmq:
     image: rabbitmq:3.8-management-alpine
+    restart: unless-stopped
     env_file: .env
     environment:
       RABBITMQ_DEFAULT_USER:
       RABBITMQ_DEFAULT_PASS:
       RABBITMQ_DEFAULT_VHOST:
-    ports:
-      - 5672:5672
-      - 15672:15672
+#    ports:
+#      - 5672:5672
+#      - 15672:15672
   web:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
@@ -26,7 +29,6 @@ services:
       - "${DJANGO_PORT}:8000"
     depends_on:
       - db
-      # - rabbitmq
     volumes:
       - .:/code
 #      - ./gold_crowdsale/accounts:/code/gold_crowdsale/accounts
@@ -35,6 +37,7 @@ services:
 #      - ./gold_crowdsale/rates:/code/gold_crowdsale/rates
     command: bash -c "python manage.py runserver 0.0.0.0:8000"
   scanner:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
@@ -47,21 +50,17 @@ services:
       - ./scanner/block_numbers:/code/scanner/block_numbers
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python scanner/main.py'
   receiver:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
     env_file: .env
-    #    ports:
-    #      - "${DJANGO_PORT}:8000"
     depends_on:
       - db
       - rabbitmq
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python receiver.py'
-  redis:
-    container_name: redis-mq
-    restart: always
-    image: redis:alpine
   dramatiq:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile
@@ -69,10 +68,18 @@ services:
       - .env
     depends_on:
       - db
-      - redis
-      # - web
-    # restart: unless-stopped
-    command: bash -c './wait-for-it.sh -t 60 redis:6379 -- python manage.py rundramatiq'
+      - rabbitmq
+    command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python manage.py rundramatiq'
+  scheduler:
+    restart: unless-stopped
+    env_file: .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+      - rabbitmq
+    command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python manage.py run_scheduler'
 
 #  elasticsearch:
 #    image: "docker.elastic.co/elasticsearch/elasticsearch:7.2.0"
