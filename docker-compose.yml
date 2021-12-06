@@ -81,26 +81,26 @@ services:
       - rabbitmq
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python manage.py run_scheduler'
 
-#  elasticsearch:
-#    image: "docker.elastic.co/elasticsearch/elasticsearch:7.2.0"
-#    user: "1000"
-#    environment:
-#      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
-#      - "discovery.type=single-node"
-#    ports:
-#      - "${ELASTICSEARCH_PORT}:9200"
-#    volumes:
-#      - ./.docker/elasticsearch_data:/usr/share/elasticsearch/data
-#
-#  kibana:
-#    image: "docker.elastic.co/kibana/kibana:7.2.0"
-#    ports:
-#      - "${KIBANA_PORT}:5601"
-#
-#  filebeat:
-#    image: "docker.elastic.co/beats/filebeat:7.2.0"
-#    user: root
-#    volumes:
-#      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-#      - /var/lib/docker:/var/lib/docker:ro
-#      - /var/run/docker.sock:/var/run/docker.sock
+  elasticsearch:
+    image: "docker.elastic.co/elasticsearch/elasticsearch:7.2.0"
+    user: "1000"
+    environment:
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - "discovery.type=single-node"
+    ports:
+      - "${ELASTICSEARCH_PORT}:9200"
+    volumes:
+      - ./.docker/elasticsearch_data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: "docker.elastic.co/kibana/kibana:7.2.0"
+    ports:
+      - "${KIBANA_PORT}:5601"
+
+  filebeat:
+    image: "docker.elastic.co/beats/filebeat:7.2.0"
+    user: root
+    volumes:
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /var/run/docker.sock:/var/run/docker.sock
