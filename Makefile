@@ -33,3 +33,6 @@ logs:
 remove_migrations:
 	bash -c "for file in $$(find gold_crowdsale -name 000*); do sudo rm -rf $$file; done"
 
+fix_filebeat_permissions:
+	sudo chown root:root filebeat.yml
+

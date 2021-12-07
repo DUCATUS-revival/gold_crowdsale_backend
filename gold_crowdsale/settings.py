@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'gold_crowdsale.payments',
     'gold_crowdsale.transfers',
     'gold_crowdsale.rates',
+    'gold_crowdsale.scheduler'
 ]
 
 MIDDLEWARE = [
@@ -169,7 +170,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'console': {
-            'format': '%(asctime)s %(levelname)s [%(name)s:%(lineno)s] %(module)s %(process)d %(thread)d | %(message)s',
+            'format': '%(levelname)s [%(name)s:%(lineno)s] %(module)s | %(message)s',
         },
     },
     'handlers': {
@@ -205,6 +206,8 @@ DECIMALS = {
     'USD': 10 ** 2,
     'GOLD': 10 ** 18
 }
+
+DEFAULT_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 
 with open(os.path.dirname(__file__) + '/../config.yaml') as f:
     config_data = yaml.safe_load(f)
