@@ -1,7 +1,15 @@
 from django.db import models
 import json
 import requests
-from gold_crowdsale.settings import RATES_SETTINGS
+import logging
+from gold_crowdsale.settings import RATES_SETTINGS, DECIMALS
+
+
+def create_rate_obj():
+    usd_rate = UsdRate()
+    usd_rate.fetch_rates()
+
+    return usd_rate
 
 
 class UsdRate(models.Model):
@@ -12,9 +20,9 @@ class UsdRate(models.Model):
     GOLD = models.FloatField()
     # DUC = models.FloatField()
     # DUCX = models.FloatField()
-    last_update_datetime = models.DateTimeField(auto_now=True)
+    creation_datetime = models.DateTimeField(auto_now_add=True)
 
-    def update_rates(self):
+    def fetch_rates(self):
         payload = {
             'fsym': 'USD',
             'tsyms': ['BTC', 'ETH', 'USDC', 'USDT'],
@@ -31,10 +39,5 @@ class UsdRate(models.Model):
         self.USDT = response_data['USDT']
         self.GOLD = RATES_SETTINGS.get('gold_price')
 
-        # response = requests.get(RATES_API.get('DUCATUS_RATES_URL').format(fsym='USD', tsyms='DUC,DUCX'))
-        # if response.status_code != 200:
-        #     raise Exception(f'Cannot get DUC exchange rate')
-        # rates = json.loads(response.content)
-        #
-        # self.DUC = rates['DUC']
-        # self.DUCX = rates['DUCX']
+        self.save()
+

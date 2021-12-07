@@ -1,25 +1,19 @@
 version: "3.8"
 services:
   db:
+    container_name: db
     image: postgres:13.4
     restart: unless-stopped
     env_file: .env
     volumes:
       - ./.docker/postgres-data:/var/lib/postgresql/data
-#    ports:
-#      - 5432:5432
   rabbitmq:
+    container_name: rabbitmq
     image: rabbitmq:3.8-management-alpine
     restart: unless-stopped
     env_file: .env
-#    environment:
-#      RABBITMQ_DEFAULT_USER:
-#      RABBITMQ_DEFAULT_PASS:
-#      RABBITMQ_DEFAULT_VHOST:
-#    ports:
-#      - 5672:5672
-#      - 15672:15672
   web:
+    container_name: web
     restart: unless-stopped
     image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
     build:
@@ -32,12 +26,9 @@ services:
       - db
     volumes:
       - .:/code
-#      - ./gold_crowdsale/accounts:/code/gold_crowdsale/accounts
-#      - ./gold_crowdsale/purchases:/code/gold_crowdsale/purchases
-#      - ./gold_crowdsale/transfers:/code/gold_crowdsale/transfers
-#      - ./gold_crowdsale/rates:/code/gold_crowdsale/rates
     command: bash -c "python manage.py runserver 0.0.0.0:8000"
   scanner:
+    container_name: scanner
     restart: unless-stopped
     image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
     build:
@@ -52,6 +43,7 @@ services:
       - ./scanner/block_numbers:/code/scanner/block_numbers
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python scanner/main.py'
   receiver:
+    container_name: receiver
     restart: unless-stopped
     image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
     build:
@@ -63,6 +55,7 @@ services:
       - rabbitmq
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python receiver.py'
   dramatiq:
+    container_name: dramatiq
     restart: unless-stopped
     image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
     build:
@@ -75,6 +68,7 @@ services:
       - rabbitmq
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python manage.py rundramatiq'
   scheduler:
+    container_name: scheduler
     restart: unless-stopped
     image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
     env_file: .env
@@ -87,6 +81,7 @@ services:
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python manage.py run_scheduler'
 
   elasticsearch:
+    container_name: elasticsearch
     image: "docker.elastic.co/elasticsearch/elasticsearch:7.2.0"
     user: "1000"
     environment:
@@ -98,11 +93,13 @@ services:
       - ./.docker/elasticsearch_data:/usr/share/elasticsearch/data
 
   kibana:
+    container_name: kibana
     image: "docker.elastic.co/kibana/kibana:7.2.0"
     ports:
       - "${KIBANA_PORT}:5601"
 
   filebeat:
+    container_name: filebeat
     image: "docker.elastic.co/beats/filebeat:7.2.0"
     user: root
     volumes:

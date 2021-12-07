@@ -1,14 +1,12 @@
 import logging
 import traceback
 import sys
-import decimal
 
 from gold_crowdsale.settings import DECIMALS
 from gold_crowdsale.accounts.models import BlockchainAccount
 from gold_crowdsale.purchases.models import TokenPurchase
 from gold_crowdsale.payments.models import Payment
-from gold_crowdsale.transfers.models import TokenTransfer
-from gold_crowdsale.rates.models import UsdRate
+from gold_crowdsale.transfers.models import create_transfer
 
 
 def save_payment(token_purchase, message):
@@ -22,31 +20,6 @@ def save_payment(token_purchase, message):
     token_purchase.payment = payment
     token_purchase.save()
     return payment
-
-
-def create_transfer(token_purchase):
-    try:
-        rate_object = UsdRate.objects.first()
-        if not rate_object:
-            raise UsdRate.DoesNotExist()
-    except UsdRate.DoesNotExist:
-        raise Exception('CREATING TRANSFER ERROR: database does not have saved rates, check scheduler')
-
-    usd_rate = getattr(rate_object, token_purchase.payment.currency)
-    gold_rate = rate_object.GOLD
-    usd_amount = int(token_purchase.payment.amount) / DECIMALS[token_purchase.payment.currency] / usd_rate
-    gold_token_amount = int(usd_amount / gold_rate * DECIMALS['GOLD'])
-
-    token_transfer = TokenTransfer(
-        token_purchase=token_purchase,
-        amount=gold_token_amount,
-    )
-    token_transfer.save()
-    logging.info(f'''
-       CREATING GOLD TRANSFER: {token_purchase.user_address} 
-       for {int(token_transfer.amount / DECIMALS['GOLD'])} GOLD successfully created
-    ''')
-    return token_transfer
 
 
 def parse_payment_message(message):

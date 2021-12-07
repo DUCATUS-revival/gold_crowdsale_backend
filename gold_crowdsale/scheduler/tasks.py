@@ -6,7 +6,7 @@ import dramatiq
 
 from gold_crowdsale.settings import SCHEDULER_SETTINGS, DEFAULT_TIME_FORMAT
 from gold_crowdsale.accounts.models import BlockchainAccount
-from gold_crowdsale.rates.models import UsdRate
+from gold_crowdsale.rates.models import create_rate_obj
 from gold_crowdsale.rates.serializers import UsdRateSerializer
 
 
@@ -28,14 +28,12 @@ def check_and_release_accounts():
 
 
 @dramatiq.actor
-def update_rates():
-    rate = UsdRate.objects.first() or UsdRate()
+def create_rates_task():
     try:
-        rate.update_rates()
-        rate.save()
+        usd_rate = create_rate_obj()
+        logging.info(f'RATES TASK: Prices updated, new values: {UsdRateSerializer(usd_rate).data} '
+                     f'at {usd_rate.creation_datetime.strftime(DEFAULT_TIME_FORMAT)}')
     except Exception as e:
+        logging.error(f'RATES TAKS FAILED: Cannot fetch new rates because: {e}')
         logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
-
-    logging.info(f'RATES TASK: Prices updated, new values: {UsdRateSerializer(rate).data} '
-                 f'at {rate.last_update_datetime.strftime(DEFAULT_TIME_FORMAT)}')
 

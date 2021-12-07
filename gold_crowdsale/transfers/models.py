@@ -7,7 +7,8 @@ from web3 import Web3, HTTPProvider
 
 from django.db import models
 
-from gold_crowdsale.settings import MAX_AMOUNT_LEN, BASE_DIR, RELAYING_NETWORK
+from gold_crowdsale.rates.models import UsdRate
+from gold_crowdsale.settings import MAX_AMOUNT_LEN, BASE_DIR, RELAYING_NETWORK, DECIMALS
 from gold_crowdsale.purchases.models import TokenPurchase
 
 
@@ -20,16 +21,30 @@ def load_w3_and_contract():
     gold_token_contract = w3.eth.contract(address=RELAYING_NETWORK.get('gold_token_address'), abi=erc20_abi)
     return w3, gold_token_contract
 
-def save_transfer(token_purchase, tx, sent_amount):
-    transfer = TokenTransfer(
-        token_purchase=token_purchase,
-        tx_hash=tx,
-        amount=sent_amount
-    )
-    transfer.save()
 
-    logging.info(f'trasfer saved with id {transfer.id}')
-    return transfer
+def create_transfer(token_purchase):
+    try:
+        rate_object = UsdRate.objects.order_by('creation_datetime').last()
+        if not rate_object:
+            raise UsdRate.DoesNotExist()
+    except UsdRate.DoesNotExist:
+        raise Exception('CREATING TRANSFER ERROR: database does not have saved rates, check scheduler')
+
+    usd_rate = getattr(rate_object, token_purchase.payment.currency)
+    gold_rate = rate_object.GOLD
+    usd_amount = int(token_purchase.payment.amount) / DECIMALS[token_purchase.payment.currency] / usd_rate
+    gold_token_amount = int(usd_amount / gold_rate * DECIMALS['GOLD'])
+
+    token_transfer = TokenTransfer(
+        token_purchase=token_purchase,
+        amount=gold_token_amount,
+    )
+    token_transfer.save()
+    logging.info(f'''
+       CREATING GOLD TRANSFER: {token_purchase.user_address} 
+       for {int(token_transfer.amount / DECIMALS['GOLD'])} GOLD successfully created
+    ''')
+    return token_transfer
 
 
 def parse_transfer_confirmation(message):

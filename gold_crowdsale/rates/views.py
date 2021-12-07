@@ -11,10 +11,10 @@ from gold_crowdsale.rates.serializers import UsdRateSerializer
 
 class UsdRateView(APIView):
     @swagger_auto_schema(
-        operation_description="Get USD rates",
+        operation_description="Get current USD rates",
         responses={200: UsdRateSerializer()},
     )
     def get(self, request):
-        rate = UsdRate.objects.first()
+        rate = UsdRate.objects.order_by('creation_datetime').last()
         serializer = UsdRateSerializer(rate)
         return Response(serializer.data, status=200)

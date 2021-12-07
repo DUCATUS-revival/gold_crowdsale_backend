@@ -29,10 +29,14 @@ class TokenPurchaseView(APIView):
             schema=openapi.Schema(
                 type=openapi.TYPE_OBJECT,
                 properties={
-                    'user_address': openapi.Schema(type=openapi.TYPE_STRING),
-                    'payment_addresses': openapi.Schema(type=openapi.TYPE_STRING),
                     'eth_address': openapi.Schema(type=openapi.TYPE_STRING),
-                },
+                    'btc_address': openapi.Schema(type=openapi.TYPE_STRING),
+                    'request_data:': openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'user_address': openapi.Schema(type=openapi.TYPE_STRING),
+                        })
+                }
             )
         )},
     )
@@ -64,7 +68,10 @@ class TokenPurchaseView(APIView):
 
         payment_account.set_receiving()
 
-        return Response(payment_account_serialized.data, status=status.HTTP_201_CREATED)
+        response_data = payment_account_serialized.data
+        response_data['request_data'] = request.data
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
 
 
