@@ -16,14 +16,14 @@ output.elasticsearch:
   hosts: ["elasticsearch:9200"]
   indices:
     - index: "filebeat-elastic-%{[agent.version]}-%{+yyyy.MM.dd}"
-      when.or:
+      when.and:
         - equals:
-            container.image.name: docker.elastic.co/beats/filebeat:7.2.0
-        - equals:
-            container.image.name: docker.elastic.co/elasticsearch/elasticsearch:7.2.0
-        - equals:
-            container.image.name: docker.elastic.co/kibana/kibana:7.2.0
+            container.labels.com_docker_compose_project: gold_crowdsale_backend
+        - contains:
+              container.image.name: docker.elastic.co
     - index: "filebeat-apps-%{[agent.version]}-%{+yyyy.MM.dd}"
+      when.equals:
+        container.labels.com_docker_compose_project: gold_crowdsale_backend
 
 logging.json: true
 logging.metrics.enabled: false

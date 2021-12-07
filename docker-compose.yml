@@ -12,10 +12,10 @@ services:
     image: rabbitmq:3.8-management-alpine
     restart: unless-stopped
     env_file: .env
-    environment:
-      RABBITMQ_DEFAULT_USER:
-      RABBITMQ_DEFAULT_PASS:
-      RABBITMQ_DEFAULT_VHOST:
+#    environment:
+#      RABBITMQ_DEFAULT_USER:
+#      RABBITMQ_DEFAULT_PASS:
+#      RABBITMQ_DEFAULT_VHOST:
 #    ports:
 #      - 5672:5672
 #      - 15672:15672
