@@ -21,6 +21,7 @@ services:
 #      - 15672:15672
   web:
     restart: unless-stopped
+    image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
     build:
       context: .
       dockerfile: Dockerfile
@@ -38,6 +39,7 @@ services:
     command: bash -c "python manage.py runserver 0.0.0.0:8000"
   scanner:
     restart: unless-stopped
+    image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
     build:
       context: .
       dockerfile: Dockerfile
@@ -51,6 +53,7 @@ services:
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python scanner/main.py'
   receiver:
     restart: unless-stopped
+    image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
     build:
       context: .
       dockerfile: Dockerfile
@@ -61,6 +64,7 @@ services:
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python receiver.py'
   dramatiq:
     restart: unless-stopped
+    image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
     build:
       context: .
       dockerfile: Dockerfile
@@ -72,6 +76,7 @@ services:
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python manage.py rundramatiq'
   scheduler:
     restart: unless-stopped
+    image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
     env_file: .env
     build:
       context: .
