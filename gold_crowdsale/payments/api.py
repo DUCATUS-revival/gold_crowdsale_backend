@@ -31,10 +31,9 @@ def parse_payment_message(message):
             # address=message.get('address').lower()
         )
         if not blockchain_account.exists():
-            logging.error(f'''
-                PARSING PAYMENT ERROR: Could not find HD Wallet account {message.get("exchangeId")} 
-                with address {message.get("address")}, tx: {message.get("transactionHash")} not processed due to error 
-            ''')
+            logging.error(f'PARSING PAYMENT ERROR: Could not find HD Wallet account {message.get("exchangeId")} '
+                          f'with address {message.get("address")}, tx: {message.get("transactionHash")}'
+                          f' not processed due to error')
             return
         else:
             blockchain_account = blockchain_account.get()
@@ -48,31 +47,23 @@ def parse_payment_message(message):
             status=TokenPurchase.Status.PENDING
         )
         if not token_purchase.exists():
-            logging.error(f'''
-                PARSING PAYMENT ERROR: Could not find pending purchase for account with address
-                {message.get("address")}, tx {message.get("transactionHash")} not processes due error'
-            ''')
+            logging.error(f'PARSING PAYMENT ERROR: Could not find pending purchase for account with address'
+                          f'{message.get("address")}, tx {message.get("transactionHash")} not processes due error')
             return
         else:
             token_purchase = token_purchase.get()
 
         payment = save_payment(token_purchase, message)
+        if payment:
+            blockchain_account.set_available()
+            logging.info(f'PARSING PAYMENT: Blockchain account id {blockchain_account.id}'
+                         f'({blockchain_account.eth_address} / {blockchain_account.btc_address}) available again')
 
-        logging.info(f'''
-            PARSING PAYMENT: payment {payment.tx_hash} 
-            for {int(payment.amount) / int(DECIMALS[payment.currency])} {payment.currency} successfully saved
-        ''')
+        logging.info(f'PARSING PAYMENT: payment {payment.tx_hash} '
+                     f'for {int(payment.amount) / int(DECIMALS[payment.currency])} {payment.currency} '
+                     f'successfully saved')
 
-        transfer = create_transfer(token_purchase)
-        if transfer:
-            try:
-                # TODO: send transfers via dramatiq
-                transfer.send_to_user()
-                logging.info(f'TRANSFER: success sending {transfer.amount} tokens to {token_purchase.user_address}')
-            except Exception:
-                logging.error(f'TRANSFER ERROR: fail to send {transfer.amount} tokens to {token_purchase.user_address}')
-                logging.error('error traceback:')
-                logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
+        create_transfer(token_purchase)
 
     else:
         logging.warning(f'PARSING PAYMENT: payment {tx_hash} already registered')

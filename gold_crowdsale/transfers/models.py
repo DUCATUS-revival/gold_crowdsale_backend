@@ -40,30 +40,10 @@ def create_transfer(token_purchase):
         amount=gold_token_amount,
     )
     token_transfer.save()
-    logging.info(f'''
-       CREATING GOLD TRANSFER: {token_purchase.user_address} 
-       for {int(token_transfer.amount / DECIMALS['GOLD'])} GOLD successfully created
-    ''')
+    logging.info(f'CREATING GOLD TRANSFER: {token_purchase.user_address} for '
+                 f'{int(token_transfer.amount / DECIMALS["GOLD"])} GOLD successfully created')
+
     return token_transfer
-
-
-def parse_transfer_confirmation(message):
-
-    transfer = TokenTransfer.objects.filter(
-        id=message.get('transferId'),
-        tx_hash=message.get('transactionHash')
-    )
-
-    if not transfer.exists():
-        logging.error(f'''
-            PARSING TRANSFER CONIFRMATION ERROR: Could not find transfer {message.get("transferId")} 
-            with hash {message.get('transactionHash')} 
-        ''')
-        return
-    else:
-        transfer = transfer.get()
-
-    transfer.validate_receipt()
 
 
 class TokenTransfer(models.Model):
@@ -93,7 +73,10 @@ class TokenTransfer(models.Model):
         w3, gold_token_contract = load_w3_and_contract()
 
         relay_tx_params = {
-            'nonce': w3.eth.get_transaction_count(w3.toChecksumAddress(RELAYING_NETWORK.get('relay_address')), 'pending'),
+            'nonce': w3.eth.get_transaction_count(
+                w3.toChecksumAddress(RELAYING_NETWORK.get('relay_address')),
+                'pending'
+            ),
             'gas': RELAYING_NETWORK.get('relay_gas_limit'),
             'gasPrice': RELAYING_NETWORK.get('relay_gas_price')
         }
@@ -106,9 +89,10 @@ class TokenTransfer(models.Model):
         try:
             sent_tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction).hex()
             self.status = self.Status.PENDING
+            logging.info(f'TRANSFER DONE: success sending {int(self.amount / DECIMALS["GOLD"])} GOLD'
+                         f'tokens to {self.token_purchase.user_address}')
         except Exception as e:
-            logging.error('Could not relay token transfer tx')
-            logging.error(e)
+            logging.error(f'TRANSFER ERROR: Could not relay token transfer tx: {e}')
             logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
             sent_tx_hash = None
             self.status = self.Status.FAILED
@@ -121,7 +105,7 @@ class TokenTransfer(models.Model):
 
     def validate_receipt(self):
         if self.status == self.Status.COMPLETED:
-            logging.info(f'Token transfer already validated (tx: {self.tx_hash})')
+            logging.info(f'TANSFER CONFIRMATION: Token transfer already validated (tx: {self.tx_hash})')
             return
 
         w3, gold_token_contract = load_w3_and_contract()
@@ -137,11 +121,3 @@ class TokenTransfer(models.Model):
             logging.info(f'TRANSFER CONFIRMATION: Transfer {self.tx_hash} completed')
 
         self.save()
-
-
-
-
-    # def __str__(self):
-    #     if isinstance(self.tx_hash, str):
-    #         return self.tx_hash
-    #     return 'null'

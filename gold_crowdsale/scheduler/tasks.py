@@ -4,30 +4,34 @@ import traceback
 import datetime
 import dramatiq
 
+from django.db import transaction, OperationalError
+from django.utils import timezone
+
 from gold_crowdsale.settings import SCHEDULER_SETTINGS, DEFAULT_TIME_FORMAT
 from gold_crowdsale.accounts.models import BlockchainAccount
 from gold_crowdsale.rates.models import create_rate_obj
 from gold_crowdsale.rates.serializers import UsdRateSerializer
+from gold_crowdsale.transfers.models import TokenTransfer
 
 
-@dramatiq.actor
+@dramatiq.actor(max_retries=0)
 def check_and_release_accounts():
     receiving_accounts = BlockchainAccount.objects.filter(status=BlockchainAccount.Status.RECEIVING)
 
     updated_accounts = 0
     for account in receiving_accounts:
-        is_timeout_passed = datetime.datetime.now() > \
+        is_timeout_passed = timezone.now() > \
             account.last_updated + datetime.timedelta(seconds=SCHEDULER_SETTINGS.get('accounts_drop_timeout'))
 
         if is_timeout_passed:
             account.set_available()
             updated_accounts += 1
 
-    task_time = datetime.datetime.now().strftime(DEFAULT_TIME_FORMAT)
+    task_time = timezone.now().strftime(DEFAULT_TIME_FORMAT)
     logging.info(f'ACCOUNTS TASK: Receiving status dropped for {updated_accounts} accounts successfully at {task_time}')
 
 
-@dramatiq.actor
+@dramatiq.actor(max_retries=0)
 def create_rates_task():
     try:
         usd_rate = create_rate_obj()
@@ -37,3 +41,32 @@ def create_rates_task():
         logging.error(f'RATES TAKS FAILED: Cannot fetch new rates because: {e}')
         logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
 
+
+@dramatiq.actor(max_retries=0)
+def select_created_transfers():
+    select_transfers(TokenTransfer.Status.CREATED)
+
+
+@dramatiq.actor(max_retries=0)
+def select_pending_transfers():
+    select_transfers(TokenTransfer.Status.PENDING)
+
+
+def select_transfers(*status_list):
+    transfers = TokenTransfer.objects.filter(status__in=status_list)
+    for transfer in transfers:
+        process_transfer(transfer.id)
+
+
+def process_transfer(transfer_id):
+    try:
+        with transaction.atomic():
+            token_transfer = TokenTransfer.objects.select_for_update(nowait=True).get(id=transfer_id)
+            if token_transfer.status == TokenTransfer.Status.CREATED:
+                token_transfer.send_to_user()
+            elif token_transfer.status == TokenTransfer.Status.PENDING:
+                token_transfer.validate_receipt()
+
+    except OperationalError as e:
+        logging.error(f'PROCESS TRANSFER ERROR: failed process id {transfer_id} with error: {e}')
+        pass

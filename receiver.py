@@ -4,17 +4,14 @@ import traceback
 import threading
 import json
 import sys
-from types import FunctionType
 
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gold_crowdsale.settings')
 import django
 django.setup()
 
-from django.core.exceptions import ObjectDoesNotExist
 from gold_crowdsale.settings import NETWORKS
 from gold_crowdsale.payments.api import parse_payment_message
-from gold_crowdsale.transfers.models import parse_transfer_confirmation
 
 
 class Receiver(threading.Thread):
@@ -60,9 +57,6 @@ class Receiver(threading.Thread):
         print('RECEIVER: payment message received', flush=True)
         parse_payment_message(message)
 
-    def transferred(self, message):
-        print('TRANSFER CONFIRMATION RECEIVED', flush=True)
-        parse_transfer_confirmation(message)
 
     def callback(self, ch, method, properties, body):
         print('RECEIVER: received', body, properties, method, flush=True)
