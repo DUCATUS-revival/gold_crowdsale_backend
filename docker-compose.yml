@@ -87,8 +87,8 @@ services:
     environment:
       - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
       - "discovery.type=single-node"
-    ports:
-      - "${ELASTICSEARCH_PORT}:9200"
+    # ports:
+    #- "${ELASTICSEARCH_PORT}:9200"
     volumes:
       - ./.docker/elasticsearch_data:/usr/share/elasticsearch/data
 
