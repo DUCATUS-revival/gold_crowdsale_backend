@@ -95,8 +95,13 @@ services:
   kibana:
     container_name: kibana
     image: "docker.elastic.co/kibana/kibana:7.2.0"
+    environment:
+      - "SERVER_BASEPATH=/kibana"
+      - "SERVER_REWRITEBASEPATH=true"
     ports:
       - "${KIBANA_PORT}:5601"
+    depends_on:
+      - elasticsearch
 
   filebeat:
     container_name: filebeat
