@@ -6,4 +6,4 @@ from .models import TokenPurchase
 class TokenPurchaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = TokenPurchase
-        fields = ['user_address', 'payment_addresses']
+        fields = ['eth_address', 'btc_address', 'user_address']
