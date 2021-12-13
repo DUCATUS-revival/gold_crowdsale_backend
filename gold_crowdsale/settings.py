@@ -209,7 +209,7 @@ DECIMALS = {
 
 DEFAULT_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 
-with open(os.path.dirname(__file__) + '/../config.yaml') as f:
+with open(os.path.join(BASE_DIR, 'config.yaml')) as f:
     config_data = yaml.safe_load(f)
 
 ROOT_KEYS = config_data.get('root_keys', None)
