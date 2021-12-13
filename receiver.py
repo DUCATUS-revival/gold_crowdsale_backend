@@ -11,7 +11,7 @@ import django
 django.setup()
 
 from gold_crowdsale.settings import NETWORKS
-from gold_crowdsale.payments.api import parse_payment_message
+from gold_crowdsale.payments.models import parse_payment_message
 
 
 class Receiver(threading.Thread):
