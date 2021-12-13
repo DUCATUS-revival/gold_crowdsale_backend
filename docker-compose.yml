@@ -53,6 +53,8 @@ services:
     depends_on:
       - db
       - rabbitmq
+    volumes:
+      - .:/code
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python receiver.py'
   dramatiq:
     container_name: dramatiq
@@ -66,6 +68,8 @@ services:
     depends_on:
       - db
       - rabbitmq
+    volumes:
+      - .:/code
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python manage.py rundramatiq'
   scheduler:
     container_name: scheduler
@@ -78,6 +82,8 @@ services:
     depends_on:
       - db
       - rabbitmq
+    volumes:
+      - .:/code
     command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python manage.py run_scheduler'
 
   elasticsearch:
