@@ -35,4 +35,8 @@ remove_migrations:
 
 fix_filebeat_permissions:
 	sudo chown root:root filebeat.yml
+	sudo chmod 644 filebeat.yml
 
+prepare_elastic:
+	mkdir -p .docker/elasticsearch_data
+	sudo chown -R 1000:1000 .docker/elasticsearch_data
