@@ -193,6 +193,11 @@ SHELL_PLUS = 'ptpython'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+REST_FRAMEWORK = {
+'DEFAULT_AUTHENTICATION_CLASSES': (
+    'rest_framework.authentication.SessionAuthentication'
+)}
+
 MAX_AMOUNT_LEN = len(str(2 ** 256))
 
 DECIMALS = {
