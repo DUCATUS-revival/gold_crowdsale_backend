@@ -1,5 +1,4 @@
 include .env
-backup_file := pg_$(shell date "+%Y_%m_%d_%H:%M:%S").sql.gz
 compose_file := docker-compose.yml
 compose := docker-compose -f $(compose_file)
 
@@ -15,10 +14,10 @@ up: build
 down:
 	$(compose) down
 
-makemigrations:
-	$(compose) exec web python manage.py makemigrations
+make_all_migrations:
+	$(compose) exec web python manage.py makemigrations payments purchases rates transfers
 
-migrate:
+migrate_all:
 	$(compose) exec web python manage.py migrate
 
 shell:
