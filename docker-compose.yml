@@ -41,7 +41,7 @@ services:
     volumes:
       - ./scanner/settings:/code/scanner/settings
       - ./scanner/block_numbers:/code/scanner/block_numbers
-    command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python scanner/main.py'
+    command: bash -c 'python scanner/main.py'
   receiver:
     container_name: receiver
     restart: unless-stopped
@@ -55,7 +55,7 @@ services:
       - rabbitmq
     volumes:
       - .:/code
-    command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python receiver.py'
+    command: bash -c 'python receiver.py'
   dramatiq:
     container_name: dramatiq
     restart: unless-stopped
@@ -70,7 +70,7 @@ services:
       - rabbitmq
     volumes:
       - .:/code
-    command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python manage.py rundramatiq'
+    command: bash -c 'python manage.py rundramatiq'
   scheduler:
     container_name: scheduler
     restart: unless-stopped
@@ -84,7 +84,7 @@ services:
       - rabbitmq
     volumes:
       - .:/code
-    command: bash -c './wait-for-it.sh -t 60 rabbitmq:5672 -- python manage.py run_scheduler'
+    command: bash -c 'python manage.py run_scheduler'
 
   elasticsearch:
     container_name: elasticsearch
