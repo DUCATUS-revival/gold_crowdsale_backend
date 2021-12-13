@@ -1,5 +1,5 @@
 from base import BlockEvent, BaseMonitor
-from models import BlockchainAccount, session
+from models import TokenPurchase, session
 from settings import CONFIG
 
 
@@ -29,8 +29,8 @@ class ERC20PaymentMonitor(BaseMonitor):
             transfer_to = processed_receipt[0].args.to
             tokens_amount = processed_receipt[0].args.value
 
-            user_site_balance = session.query(BlockchainAccount).\
-                filter(BlockchainAccount.eth_address == transfer_to.lower()).first()
+            user_site_balance = session.query(TokenPurchase).\
+                filter(TokenPurchase.eth_address == transfer_to.lower()).first()
             if not user_site_balance:
                 continue
             print('second if end')

@@ -1,5 +1,5 @@
 from base import BlockEvent, BaseMonitor
-from models import BlockchainAccount, session
+from models import TokenPurchase, session
 from settings import CONFIG
 
 
@@ -23,7 +23,7 @@ class BTCPaymentMonitor(BaseMonitor):
 
     def on_new_block_event(self, block_event: BlockEvent):
         addresses = block_event.transactions_by_address.keys()
-        user_site_balances = session.query(BlockchainAccount).filter(self.address_from(BlockchainAccount).in_(addresses)).all()
+        user_site_balances = session.query(TokenPurchase).filter(self.address_from(TokenPurchase).in_(addresses)).all()
         for user_site_balance in user_site_balances:
             address = self.address_from(user_site_balance)
             transactions = block_event.transactions_by_address[address]

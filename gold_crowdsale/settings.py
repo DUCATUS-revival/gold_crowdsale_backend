@@ -44,7 +44,6 @@ INSTALLED_APPS = [
     'drf_yasg',
     'django_extensions',
     'django_dramatiq',
-    'gold_crowdsale.accounts',
     'gold_crowdsale.purchases',
     'gold_crowdsale.payments',
     'gold_crowdsale.transfers',
@@ -213,13 +212,14 @@ with open(os.path.join(BASE_DIR, 'config.yaml')) as f:
     config_data = yaml.safe_load(f)
 
 ROOT_KEYS = config_data.get('root_keys', None)
-NETWORKS = config_data.get('networks', None)
+CONFIG_NETWORKS = config_data.get('networks', None)
 GOLD_TOKEN_ADDRESS = config_data.get('gold_token_address', None)
 RATES_SETTINGS = config_data.get('rates_settings', None)
 
-RELAYING_NETWORK = None
-for net, value in NETWORKS.items():
-    if value.get('is_relaying'):
-        RELAYING_NETWORK = value
+NETWORKS = {}
+for net, value in CONFIG_NETWORKS.items():
+    net_currency = value.get('currency')
+    NETWORKS[net_currency] = value
+
 
 SCHEDULER_SETTINGS = config_data.get('scheduler_settings', None)

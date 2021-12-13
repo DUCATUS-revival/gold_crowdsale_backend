@@ -8,7 +8,7 @@ Base = automap_base()
 engine = create_engine(CONFIG['db']['url'])
 Base.prepare(engine, reflect=True)
 
-BlockchainAccount = Base.classes.accounts_blockchainaccount
+TokenPurchase = Base.classes.purchases_tokenpurchase
 Transfers = Base.classes.transfers_tokentransfer
 
 session = Session(engine)

@@ -8,7 +8,7 @@ from web3 import Web3, HTTPProvider
 from django.db import models
 
 from gold_crowdsale.rates.models import UsdRate
-from gold_crowdsale.settings import MAX_AMOUNT_LEN, BASE_DIR, RELAYING_NETWORK, DECIMALS
+from gold_crowdsale.settings import MAX_AMOUNT_LEN, BASE_DIR, NETWORKS, DECIMALS
 from gold_crowdsale.purchases.models import TokenPurchase
 
 
@@ -16,9 +16,9 @@ def load_w3_and_contract():
     with open(os.path.join(BASE_DIR, 'gold_crowdsale/erc20_abi.json'), 'r') as erc20_file:
         erc20_abi = json.load(erc20_file)
 
-    w3 = Web3(HTTPProvider(RELAYING_NETWORK.get('url')))
+    w3 = Web3(HTTPProvider(NETWORKS.get('DUCX').get('url')))
 
-    gold_token_contract = w3.eth.contract(address=RELAYING_NETWORK.get('gold_token_address'), abi=erc20_abi)
+    gold_token_contract = w3.eth.contract(address=NETWORKS.get('DUCX').get('gold_token_address'), abi=erc20_abi)
     return w3, gold_token_contract
 
 
@@ -74,17 +74,17 @@ class TokenTransfer(models.Model):
 
         relay_tx_params = {
             'nonce': w3.eth.get_transaction_count(
-                w3.toChecksumAddress(RELAYING_NETWORK.get('relay_address')),
+                w3.toChecksumAddress(NETWORKS.get('DUCX').get('relay_address')),
                 'pending'
             ),
-            'gas': RELAYING_NETWORK.get('relay_gas_limit'),
-            'gasPrice': RELAYING_NETWORK.get('relay_gas_price')
+            'gas': NETWORKS.get('DUCX').get('relay_gas_limit'),
+            'gasPrice': NETWORKS.get('DUCX').get('relay_gas_price')
         }
 
         user_address = w3.toChecksumAddress(self.token_purchase.user_address)
         transfer_tx = gold_token_contract.functions.transfer(user_address, int(self.amount))
         built_tx = transfer_tx.buildTransaction(relay_tx_params)
-        signed_tx = w3.eth.account.sign_transaction(built_tx, private_key=RELAYING_NETWORK.get('relay_privkey'))
+        signed_tx = w3.eth.account.sign_transaction(built_tx, private_key=NETWORKS.get('DUCX').get('relay_privkey'))
 
         try:
             sent_tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction).hex()
