@@ -32,6 +32,12 @@ logs:
 remove_migrations:
 	bash -c "for file in $$(find gold_crowdsale -name 000*); do sudo rm -rf $$file; done"
 
+withdraw_btc:
+	$(compose) exec web python manage.py withdraw_btc_funds
+
+withdraw_eth:
+	$(compose) exec web python manage.py withdraw_eth_funds
+
 fix_filebeat_permissions:
 	sudo chown root:root filebeat.yml
 	sudo chmod 644 filebeat.yml

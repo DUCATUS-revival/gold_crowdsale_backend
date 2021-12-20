@@ -1,8 +1,9 @@
+import sys
+import traceback
 import logging
 import time
 
 import collections
-from web3 import Web3, HTTPProvider
 from web3.exceptions import TransactionNotFound
 from eth_account import Account
 
@@ -47,6 +48,7 @@ def withdraw_eth_funds():
             except Exception as e:
                 logging.error(f'{currency} sending gas failed. Error is:')
                 logging.error(e)
+                logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
 
         logging.info(f'\n{currency} WITHDRAW (sending tokens)')
         try:
@@ -70,9 +72,17 @@ def withdraw_eth_funds():
         except Exception as e:
             logging.error('ETH withdraw failed. Error is:')
             logging.error(e)
+            logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
 
 
 def process_send_gas_for_usdc(params, account, priv_key, transactions, currency):
+    try:
+        rate_object = UsdRate.objects.order_by('creation_datetime').last()
+        if not rate_object:
+            raise UsdRate.DoesNotExist()
+    except UsdRate.DoesNotExist:
+        raise Exception('CREATING TRANSFER ERROR: database does not have saved rates, check scheduler')
+
     if currency == 'USDT':
         web3, token_contract = load_usdt_token()
     elif currency == 'USDC':
@@ -87,10 +97,8 @@ def process_send_gas_for_usdc(params, account, priv_key, transactions, currency)
     erc20_gas_price, erc20_fake_gas_price = normalize_gas_price(web3.eth.gasPrice)
     total_gas_fee = gas_price * gas_limit
     erc20_gas_fee = erc20_gas_price * erc20_gas_limit
-    rate = UsdRate.objects.get(currency='ETH')
-    rate = rate.rate
-    token_rate = UsdRate.objects.get(currency=currency)
-    token_rate = token_rate.rate
+    rate = rate_object.ETH
+    token_rate = getattr(rate_object, currency)
     from_address = account.eth_address
     to_address = NETWORKS.get('ETH').get('withdraw_address')
 
@@ -144,6 +152,7 @@ def process_send_gas_for_usdc(params, account, priv_key, transactions, currency)
         err_str = f'Refund failed for address {from_address} and amount {withdraw_amount} ({balance} - {total_gas_fee})'
         logging.error(err_str)
         logging.error(e)
+        logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
 
 
 def parse_usdc_transactions(transactions, delayed_transactions_addresses, currency):
@@ -238,6 +247,7 @@ def process_withdraw_eth(account, priv_key):
         err_str = f'Withdraw failed for address {from_address} and amount {withdraw_amount} ({balance} - {total_gas_fee})'
         logging.error(err_str)
         logging.error(e)
+        logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
     return
 
 
@@ -285,6 +295,7 @@ def withdraw_btc_funds():
         except Exception as e:
             logging.error('BTC withdraw failed. Error is:')
             logging.error(e)
+            logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
 
 
 def process_withdraw_btc(params, account, priv_key):
@@ -317,8 +328,8 @@ def process_withdraw_btc(params, account, priv_key):
     output_params = {to_address: withdraw_amount}
 
     logging.info(f'Withdraw tx params: from {from_address} to {to_address} on amount {withdraw_amount}')
-    logging.info('input_params', inputs)
-    logging.info('output_params', output_params)
+    logging.info(f'input_params: {inputs}')
+    logging.info(f'output_params: {output_params}')
 
     sent_tx_hash = rpc.construct_and_send_tx(inputs, output_params, priv_key)
 

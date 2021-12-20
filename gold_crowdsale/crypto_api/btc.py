@@ -8,14 +8,26 @@ from gold_crowdsale.settings import NETWORKS, DECIMALS
 
 class BitcoinRPC:
     def __init__(self):
+        self.endpoint = None
         self.connection = None
         self.network_info = None
         self.version = None
         self.relay_fee = None
         self.establish_connection()
 
+    def setup_endpoint(self):
+        self.endpoint = 'http://{user}:{pwd}@{host}:{port}'.format(
+            user=NETWORKS.get('BTC').get('user'),
+            pwd=NETWORKS.get('BTC').get('password'),
+            host=NETWORKS.get('BTC').get('host'),
+            port=NETWORKS.get('BTC').get('port'),
+        )
+        # print(self.endpoint)
+        return
+
     def establish_connection(self):
-        self.connection = AuthServiceProxy(NETWORKS.get('BTC'))
+        self.setup_endpoint()
+        self.connection = AuthServiceProxy(self.endpoint)
         self.network_info = self.connection.getnetworkinfo()
         self.version = int(str(self.network_info['version'])[:2])
         res = requests.get('https://api.bitcore.io/api/BTC/mainnet/fee/100')

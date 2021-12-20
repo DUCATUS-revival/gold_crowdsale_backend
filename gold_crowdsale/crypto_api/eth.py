@@ -11,7 +11,7 @@ def load_w3(network):
 
 
 def load_w3_and_token(network, token_address):
-    with open(os.path.join(BASE_DIR, 'gold_crowdsale/erc20_abi.json'), 'r') as erc20_file:
+    with open(os.path.join(BASE_DIR, 'gold_crowdsale/crypto_api/erc20_abi.json'), 'r') as erc20_file:
         erc20_abi = json.load(erc20_file)
 
     w3 = load_w3(network)
