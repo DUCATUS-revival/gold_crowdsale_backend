@@ -265,8 +265,8 @@ def check_tx(tx):
 
 def withdraw_btc_funds():
     withdraw_parameters = {
-        'root_private_key': ROOT_KEYS['ETH-BTC']['private'],
-        'root_public_key': ROOT_KEYS['ETH-BTC']['public'],
+        'root_private_key': ROOT_KEYS.get('private'),
+        'root_public_key': ROOT_KEYS.get('public'),
         'address_to_btc': NETWORKS.get('BTC').get('withdraw_address')
     }
 
