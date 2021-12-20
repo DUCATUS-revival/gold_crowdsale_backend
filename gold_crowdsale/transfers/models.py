@@ -7,6 +7,7 @@ from web3 import Web3, HTTPProvider
 
 from django.db import models
 
+from gold_crowdsale.crypto_api.eth import load_gold_token
 from gold_crowdsale.rates.models import UsdRate
 from gold_crowdsale.settings import MAX_AMOUNT_LEN, BASE_DIR, NETWORKS, DECIMALS
 from gold_crowdsale.purchases.models import TokenPurchase
@@ -89,7 +90,7 @@ class TokenTransfer(models.Model):
             logging.info(f'Token transfer already processed (tx: {self.tx_hash})')
             return
 
-        w3, gold_token_contract = load_w3_and_contract()
+        w3, gold_token_contract = load_gold_token()
 
         relay_address = NETWORKS.get('DUCX').get('relay_address')
         relay_tx_params = {
@@ -142,7 +143,7 @@ class TokenTransfer(models.Model):
             logging.info(f'TANSFER CONFIRMATION: Token transfer already validated (tx: {self.tx_hash})')
             return
 
-        w3, gold_token_contract = load_w3_and_contract()
+        w3, gold_token_contract = load_gold_token()
 
         tx_receipt = w3.eth.getTransactionReceipt(self.tx_hash)
         processed_receipt = gold_token_contract.events.Transfer().processReceipt(tx_receipt)
