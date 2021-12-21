@@ -1,7 +1,7 @@
 import logging
 
 from django.core.management.base import BaseCommand
-from gold_crowdsale.withdrawals.services import withdraw_btc_funds
+from gold_crowdsale.withdrawals.btc import withdraw_btc_funds
 
 
 class Command(BaseCommand):

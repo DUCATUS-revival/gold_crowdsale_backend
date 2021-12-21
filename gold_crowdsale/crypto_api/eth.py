@@ -1,5 +1,6 @@
 import json
 import os
+import logging
 
 from web3 import Web3, HTTPProvider
 
@@ -16,7 +17,7 @@ def load_w3_and_token(network, token_address):
 
     w3 = load_w3(network)
 
-    gold_token_contract = w3.eth.contract(address=token_address, abi=erc20_abi)
+    gold_token_contract = w3.eth.contract(address=Web3.toChecksumAddress(token_address), abi=erc20_abi)
     return w3, gold_token_contract
 
 
@@ -25,11 +26,11 @@ def load_gold_token():
     return load_w3_and_token(net, NETWORKS.get(net).get('gold_token_address'))
 
 
-def load_usdt_token():
+def load_eth_erc20_token(currency):
     net = 'ETH'
-    return load_w3_and_token(net, NETWORKS.get(net).get('usdt_token_address'))
-
-
-def load_usdc_token():
-    net = 'ETH'
-    return load_w3_and_token(net, NETWORKS.get(net).get('usdc_token_address'))
+    if currency == 'USDT':
+        load_w3_and_token(net, NETWORKS.get(net).get('usdt_token_address'))
+    elif currency == 'USDC':
+        return load_w3_and_token(net, NETWORKS.get(net).get('usdc_token_address'))
+    else:
+        raise Exception(f'Cannot process sending gas: currency {currency} not supported')

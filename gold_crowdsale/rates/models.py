@@ -12,6 +12,15 @@ def create_rate_obj():
     return usd_rate
 
 
+def get_rate_object():
+    try:
+        rate_object = UsdRate.objects.order_by('creation_datetime').last()
+        if not rate_object:
+            raise UsdRate.DoesNotExist()
+    except UsdRate.DoesNotExist:
+        raise Exception('RATES ERROR: database does not have saved rates, check scheduler')
+
+
 class UsdRate(models.Model):
     BTC = models.FloatField()
     ETH = models.FloatField()

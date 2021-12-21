@@ -1,7 +1,7 @@
 import logging
 
 from django.core.management.base import BaseCommand
-from gold_crowdsale.withdrawals.services import withdraw_eth_funds
+from gold_crowdsale.withdrawals.eth import withdraw_eth_funds
 
 
 class Command(BaseCommand):
