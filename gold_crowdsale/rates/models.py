@@ -17,6 +17,7 @@ def get_rate_object():
         rate_object = UsdRate.objects.order_by('creation_datetime').last()
         if not rate_object:
             raise UsdRate.DoesNotExist()
+        return rate_object
     except UsdRate.DoesNotExist:
         raise Exception('RATES ERROR: database does not have saved rates, check scheduler')
 

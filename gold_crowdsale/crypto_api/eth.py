@@ -29,7 +29,7 @@ def load_gold_token():
 def load_eth_erc20_token(currency):
     net = 'ETH'
     if currency == 'USDT':
-        load_w3_and_token(net, NETWORKS.get(net).get('usdt_token_address'))
+        return load_w3_and_token(net, NETWORKS.get(net).get('usdt_token_address'))
     elif currency == 'USDC':
         return load_w3_and_token(net, NETWORKS.get(net).get('usdc_token_address'))
     else:

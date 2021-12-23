@@ -15,7 +15,7 @@ down:
 	$(compose) down
 
 make_all_migrations:
-	$(compose) exec web python manage.py makemigrations payments purchases rates transfers api_auth
+	$(compose) exec web python manage.py makemigrations payments purchases rates transfers api_auth withdrawals
 
 migrate_all:
 	$(compose) exec web python manage.py migrate
