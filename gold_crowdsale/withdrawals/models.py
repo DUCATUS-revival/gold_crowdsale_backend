@@ -93,10 +93,10 @@ class WithdrawTransaction(models.Model):
         COMPLETED = 'completed'
         SKIPPED = 'skipped'
         FAILED = 'failed'
-        REVERTED = 'reverted'
         WAITING_FOR_ERC20_TRANSFERS = 'waiting_for_erc20_transfers'
         WAITING_FOR_GAS_REFILL = 'waiting_for_gas_refill'
         ERC20_BALANCE_TOO_LOW = 'erc20_balance_too_low'
+        ERC20_TX_REVERTED = 'erc20_tx_reverted'
 
     class TransactionType(models.TextChoices):
         NATIVE = 'native'
@@ -111,6 +111,7 @@ class WithdrawTransaction(models.Model):
     tx_type = models.CharField(max_length=50, choices=TransactionType.choices, default=TransactionType.NATIVE)
     tx_hash = models.CharField(max_length=100, null=True)
     gas_tx_count = models.IntegerField(null=True, default=None)
+    gas_price_erc20 = models.DecimalField(max_digits=MAX_AMOUNT_LEN, decimal_places=0, null=True, default=None)
     error_message = models.TextField(default='', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -164,6 +165,163 @@ class WithdrawTransaction(models.Model):
             logging.error(err_str)
 
         return sent_tx_hash
+
+
+
+    def process_gas_refill(self):
+        if self.currency != 'ETH' and self.tx_type != self.TransactionType.GAS_REFILL:
+            logging.error(f'Gas refill processing called on tx with currency {self.currency} and type {self.tx_type}')
+            return
+
+        web3 = load_w3('ETH')
+        gas_price, fake_gas_price = normalize_gas_price(web3.eth.gasPrice)
+
+        refill_gas_limit = 21000
+        refill_gas_fee = gas_price * refill_gas_limit
+
+        base_erc20_gas_limit = 200000
+        erc20_gas_limit = base_erc20_gas_limit * self.gas_tx_count
+        erc20_gas_fee = gas_price * erc20_gas_limit
+
+        address_to_refill = self. account.eth_address
+
+        rate_object = get_rate_object()
+        eth_rate = rate_object.ETH
+        total_erc20_balances_in_eth = 0
+
+        erc20_withdrawals = WithdrawTransaction.objects.filter(
+            withdraw_cycle=self.withdraw_cycle,
+            account=self.account,
+            tx_type=WithdrawTransaction.TransactionType.ERC20
+        )
+
+        for token_withdrawal in erc20_withdrawals:
+            _, token_contract = load_eth_erc20_token(token_withdrawal.currency)
+            token_balance = token_contract.functions.balanceOf(web3.toChecksumAddress(address_to_refill)).call()
+            token_rate = getattr(rate_object, token_withdrawal.currency)
+            token_balance_in_eth = int(
+                ((float(token_balance) / float(DECIMALS[token_withdrawal.currency]))
+                 * float(token_rate) * float(eth_rate)) * float(DECIMALS['ETH'])
+            )
+            total_erc20_balances_in_eth += token_balance_in_eth
+            token_withdrawal.amount = token_balance
+            token_withdrawal.save()
+
+        total_gas_refill_cost = refill_gas_fee + erc20_gas_fee
+        if total_erc20_balances_in_eth <= total_gas_refill_cost:
+            logging.info(f'Refill on address {address_to_refill} skipped: '
+                         f'tokens value in ETH {total_erc20_balances_in_eth}  < tx fee of {total_gas_refill_cost}')
+            self.status = self.Status.ERC20_BALANCE_TOO_LOW
+            self.save()
+            return
+
+        address_to_refill_balance = web3.eth.getBalance(web3.toChecksumAddress(address_to_refill))
+
+        if address_to_refill_balance < int(erc20_gas_fee * 1.1):
+            logging.info(f'Refill on address {address_to_refill} skipped: '
+                         f'Current address balance {address_to_refill_balance} < {int(erc20_gas_fee * 1.1)} '
+                         f'and is not enough for withdrawing ERC20 tokens')
+            self.status = self.Status.SKIPPED
+            self.save()
+            return
+
+        address_with_gas = NETWORKS.get('ETH').get('gas_address')
+        gas_nonce = web3.eth.getTransactionCount(web3.toChecksumAddress(address_with_gas), 'pending')
+
+        refill_amount = int(erc20_gas_fee * 1.2)
+        self.amount = refill_amount
+        self.save()
+
+        gas_tx_params = {
+            'chainId': web3.eth.chainId,
+            'gas': refill_gas_limit,
+            'nonce': gas_nonce,
+            'gasPrice': fake_gas_price,
+            'to': web3.toChecksumAddress(address_to_refill),
+            'value': refill_amount
+        }
+
+        priv_key = NETWORKS.get('ETH').get('gas_privkey')
+        signed_tx = Account.signTransaction(gas_tx_params, priv_key)
+
+        try:
+            sent_tx = web3.eth.sendRawTransaction(signed_tx.get('rawTransaction'))
+            self.status = self.Status.PENDING
+            self.tx_hash = sent_tx.hex()
+            self.gas_tx_count = gas_price
+            self.save()
+            logging.info(f'Refill tx sent: {self.tx_hash}')
+        except Exception as e:
+            self.status = self.Status.FAILED
+            self.error_message = e
+            self.save()
+            logging.error(f'Refill failed for address {address_to_refill} and amount {refill_amount}), error: {e}')
+            logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
+
+    def process_withdraw_erc20(self):
+        if self.currency not in ['USDC', 'USDT'] and self.tx_type != self.TransactionType.ERC20:
+            logging.error(f'ERC20 processing called on tx with currency {self.currency} and type {self.tx_type}')
+            return
+
+        refill_transaction = WithdrawTransaction.objects.filter(
+            withdraw_cycle=self.withdraw_cycle,
+            account=self.account
+        )
+
+        if not refill_transaction:
+            logging.warning('Refill transaction not found, skipping withdraw')
+            self.status = self.Status.SKIPPED
+            self.save()
+            return
+        else:
+            refill_transaction = refill_transaction.get()
+
+        valid_refill_statuses = [
+            self.Status.COMPLETED,
+            self.Status.SKIPPED
+        ]
+
+        if refill_transaction.status is self.Status.FAILED:
+            self.status = self.Status.SKIPPED
+            self.save()
+            return
+        elif refill_transaction.status not in valid_refill_statuses:
+            return
+
+        web3, token_contract = load_eth_erc20_token(self.currency)
+
+        from_address = self.account.eth_address
+        withdraw_amount = int(self.amount)
+
+        priv_key, _ = get_private_keys(ROOT_KEYS.get('private'), self.account.id)
+
+        to_address = NETWORKS.get('ETH').get('withdraw_address')
+        gas_price, fake_gas_price = normalize_gas_price(self.gas_price_erc20)
+        erc20_gas_limit = 200000
+        nonce = web3.eth.getTransactionCount(web3.toChecksumAddress(from_address), 'pending')
+
+        tx_params = {
+            'chainId': web3.eth.chainId,
+            'nonce': nonce,
+            'gas': erc20_gas_limit,
+            'gasPrice': fake_gas_price,
+        }
+
+        logging.info(f'Withdraw tx params: from {from_address} to {to_address} on amount {withdraw_amount}')
+        initial_tx = token_contract.functions.transfer(to_address, withdraw_amount).buildTransaction(tx_params)
+        signed_tx = Account.signTransaction(initial_tx, priv_key)
+        try:
+            sent_tx = web3.eth.sendRawTransaction(signed_tx['rawTransaction'])
+            self.tx_hash = sent_tx.hex()
+            self.status = self.Status.PENDING
+            self.save()
+            logging.info(f'Withdraw {self.currency} tx sent: {self.tx_hash}')
+        except Exception as e:
+            self.status = self.Status.FAILED
+            self.error_message = e
+            self.save()
+            logging.error(f'Withdraw failed for address {from_address} and amount {withdraw_amount}, error is: {e}')
+            logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
 
     def process_withdraw_eth(self):
         if self.currency != 'ETH' and self.tx_type != self.TransactionType.NATIVE:
@@ -225,125 +383,3 @@ class WithdrawTransaction(models.Model):
             logging.error(err_str)
             logging.error(e)
             logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
-
-    def process_withdraw_erc20(self):
-        if self.currency not in ['USDC', 'USDT'] and self.tx_type != self.TransactionType.ERC20:
-            logging.error(f'ERC20 processing called on tx with currency {self.currency} and type {self.tx_type}')
-            return
-
-        web3, token_contract = load_eth_erc20_token(self.currency)
-
-        from_address = self.account.eth_address
-        balance = token_contract.functions.balanceOf(web3.toChecksumAddress(from_address)).call()
-        withdraw_amount = int(balance)
-
-        priv_key, _ = get_private_keys(ROOT_KEYS.get('private'), self.account.id)
-
-        to_address = NETWORKS.get('ETH').get('withdraw_address')
-        erc20_gas_price, erc20_fake_gas_price = normalize_gas_price(web3.eth.gasPrice)
-        erc20_gas_limit = 200000
-        nonce = web3.eth.getTransactionCount(web3.toChecksumAddress(from_address), 'pending')
-
-        tx_params = {
-            'chainId': web3.eth.chainId,
-            'nonce': nonce,
-            'gas': erc20_gas_limit,
-            'gasPrice': erc20_fake_gas_price,
-            'from': web3.toChecksumAddress(from_address),
-            'to': web3.toChecksumAddress(to_address),
-            'value': int(withdraw_amount),
-        }
-
-        logging.info(f'Withdraw tx params: from {from_address} to {to_address} on amount {withdraw_amount}')
-        initial_tx = token_contract.functions.transfer(to_address, withdraw_amount).buildTransaction(tx_params)
-        signed_tx = Account.signTransaction(initial_tx, priv_key)
-        try:
-            sent_tx = web3.eth.sendRawTransaction(signed_tx['rawTransaction'])
-            logging.info(f'sent tx: {sent_tx.hex()}')
-        except Exception as e:
-            logging.info(f'Withdraw failed for address {from_address} and amount {withdraw_amount}, error is: {e}')
-            logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
-        return
-
-    def process_gas_refill(self):
-        if self.currency != 'ETH' and self.tx_type != self.TransactionType.GAS_REFILL:
-            logging.error(f'Gas refill processing called on tx with currency {self.currency} and type {self.tx_type}')
-            return
-
-        web3 = load_w3('ETH')
-        gas_price, fake_gas_price = normalize_gas_price(web3.eth.gasPrice)
-
-        refill_gas_limit = 21000
-        refill_gas_fee = gas_price * refill_gas_limit
-
-        base_erc20_gas_limit = 200000
-        erc20_gas_limit = base_erc20_gas_limit * self.gas_tx_count
-        erc20_gas_fee = gas_price * erc20_gas_limit
-
-        address_to_refill = self. account.eth_address
-
-        rate_object = get_rate_object()
-        eth_rate = rate_object.ETH
-        total_erc20_balances_in_eth = 0
-        for token in ERC20_CURRENCIES:
-            _, token_contract = load_eth_erc20_token(token)
-            token_balance = token_contract.functions.balanceOf(web3.toChecksumAddress(address_to_refill)).call()
-            token_rate = getattr(rate_object, token)
-            token_balance_in_eth = int(
-                ((float(token_balance) / float(DECIMALS[token])) * float(token_rate) * float(eth_rate))
-                * float(DECIMALS['ETH'])
-            )
-            total_erc20_balances_in_eth += token_balance_in_eth
-
-        total_gas_refill_cost = refill_gas_fee + erc20_gas_fee
-        if total_erc20_balances_in_eth <= total_gas_refill_cost:
-            logging.info(f'Refill on address {address_to_refill} skipped: '
-                         f'tokens value in ETH {total_erc20_balances_in_eth}  < tx fee of {total_gas_refill_cost}')
-            self.status = self.Status.ERC20_BALANCE_TOO_LOW
-            self.save()
-            return
-
-        address_to_refill_balance = web3.eth.getBalance(web3.toChecksumAddress(address_to_refill))
-
-        if address_to_refill_balance > int(erc20_gas_fee * 1.1):
-            logging.info(f'Refill on address {address_to_refill} skipped: '
-                         f'Current address balance {address_to_refill_balance} > {int(erc20_gas_fee * 1.1)} '
-                         f'and is enough for withdrawing ERC20 tokens')
-            self.status = self.Status.SKIPPED
-            self.save()
-            return
-
-        priv_key = NETWORKS.get('ETH').get('gas_privkey')
-        address_with_gas = NETWORKS.get('ETH').get('gas_address')
-        gas_nonce = web3.eth.getTransactionCount(web3.toChecksumAddress(address_with_gas), 'pending')
-
-        refill_amount = int(erc20_gas_fee * 1.2)
-        self.amount = refill_amount
-        self.save()
-
-        gas_tx_params = {
-            'chainId': web3.eth.chainId,
-            'gas': refill_gas_limit,
-            'nonce': gas_nonce,
-            'gasPrice': fake_gas_price,
-            'to': web3.toChecksumAddress(address_to_refill),
-            'value': refill_amount
-        }
-
-        signed_tx = Account.signTransaction(gas_tx_params, priv_key)
-
-        try:
-            sent_tx = web3.eth.sendRawTransaction(signed_tx.get('rawTransaction'))
-            logging.info(f'Refill tx sent: {sent_tx.hex()}')
-            self.status = self.Status.PENDING
-            self.tx_hash = sent_tx.hex()
-            self.save()
-        except Exception as e:
-            logging.error(f'Refill failed for address {address_to_refill} and amount {refill_amount}), error: {e}')
-            logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
-            self.status = self.Status.FAILED
-            self.error_message = e
-            self.save()
-
-
-

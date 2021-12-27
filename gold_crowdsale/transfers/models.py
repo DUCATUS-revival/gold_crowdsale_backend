@@ -94,6 +94,7 @@ class TokenTransfer(models.Model):
 
         relay_address = NETWORKS.get('DUCX').get('relay_address')
         relay_tx_params = {
+            'chainId': w3.eth.chainId,
             'nonce': w3.eth.get_transaction_count(
                 w3.toChecksumAddress(relay_address),
                 'pending'
