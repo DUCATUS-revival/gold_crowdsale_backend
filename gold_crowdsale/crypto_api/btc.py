@@ -59,11 +59,11 @@ class BitcoinRPC:
         try:
             tx_hash = self.send_raw_transaction(signed['hex'])
             print('tx', tx_hash, flush=True)
-            return tx_hash
+            return tx_hash, True
         except Exception as e:
             print('FAILED SENDING TRANSACTION', flush=True)
             print(e, flush=True)
-            return None
+            return e, False
 
     def validateaddress(self, address):
         self.reconnect()
@@ -73,8 +73,8 @@ class BitcoinRPC:
 class BitcoinAPI:
     def __init__(self):
         self.network = 'testnet'
-        if 'production' in NETWORKS.get('BTC'):
-            if NETWORK_SETTINGS['BTC']['production']:
+        if 'is_mainnet' in NETWORKS.get('BTC'):
+            if NETWORKS.get('BTC').get('is_mainnet'):
                 self.network = 'mainnet'
 
         self.base_url = None

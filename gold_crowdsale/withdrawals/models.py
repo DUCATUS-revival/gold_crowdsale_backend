@@ -158,15 +158,20 @@ class WithdrawTransaction(models.Model):
         logging.info(f'input_params: {inputs}')
         logging.info(f'output_params: {output_params}')
 
-        sent_tx_hash = rpc.construct_and_send_tx(inputs, output_params, priv_key)
+        tx_hash_or_error_msg, send_success = rpc.construct_and_send_tx(inputs, output_params, priv_key)
 
-        if not sent_tx_hash:
-            err_str = f'Withdraw failed for address {from_address} and amount {withdraw_amount} ({balance} - {transaction_fee})'
+        if send_success:
+            self.tx_hash = tx_hash_or_error_msg
+            self.status = self.Status.PENDING
+            self.save()
+            logging.info(f'Withdraw BTC tx sent: {self.tx_hash}')
+        else:
+            self.status = self.Status.FAILED
+            self.error_message = tx_hash_or_error_msg
+            self.save()
+            err_str = f'Withdraw failed for address {from_address} and ' \
+                      f'amount {withdraw_amount} ({balance} - {transaction_fee})'
             logging.error(err_str)
-
-        return sent_tx_hash
-
-
 
     def process_gas_refill(self):
         if self.currency != 'ETH' and self.tx_type != self.TransactionType.GAS_REFILL:
@@ -376,9 +381,9 @@ class WithdrawTransaction(models.Model):
         signed_tx = Account.signTransaction(tx_params, priv_key)
         try:
             sent_tx = web3.eth.sendRawTransaction(signed_tx['rawTransaction'])
-            logging.info(f'sent tx: {sent_tx.hex()}')
+            logging.info(f'Withdraw ETH sent tx: {sent_tx.hex()}')
         except Exception as e:
-            err_str = f'Withdraw failed for address {from_address} ' \
+            err_str = f'Withdraw ETH failed for address {from_address} ' \
                       f'and amount {withdraw_amount} ({balance} - {total_gas_fee})'
             logging.error(err_str)
             logging.error(e)
