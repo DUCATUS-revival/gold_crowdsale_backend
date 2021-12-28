@@ -115,6 +115,20 @@ class WithdrawTransaction(models.Model):
     error_message = models.TextField(default='', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def process_selector(self):
+        if self.tx_type == self.TransactionType.GAS_REFILL:
+            self.process_gas_refill()
+        elif self.tx_type == self.TransactionType.ERC20:
+            self.process_withdraw_erc20()
+        else:
+            if self.currency == 'BTC':
+                self.process_withdraw_btc()
+            elif self.currency == 'ETH':
+                self.process_withdraw_eth()
+            else:
+                logging.error('Withdraw processing error: cannot select exact method for withdraw')
+                return
+
     def process_withdraw_btc(self):
         if self.currency != 'BTC' and self.tx_type != self.TransactionType.NATIVE:
             logging.error(f'BTC processing called on tx with currency {self.currency} and type {self.tx_type}')
@@ -388,3 +402,44 @@ class WithdrawTransaction(models.Model):
             logging.error(err_str)
             logging.error(e)
             logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
+
+    def confirm_selector(self):
+        if self.currency == 'ETH' or self.tx_type == self.TransactionType.ERC20:
+            self.tx_confirm_eth_erc20()
+        elif self.currency == 'BTC':
+            self.tx_confirm_btc()
+        else:
+            logging.error('Withdraw processing error: cannot select exact method for withdraw')
+            return
+
+    def tx_confirm_eth_erc20(self):
+        if self.status == self.Status.COMPLETED:
+            logging.info(f'WITHDRAW CONFIRMATION: Token transfer already validated (tx: {self.tx_hash})')
+            return
+
+        web3 = load_w3('ETH')
+        tx_receipt = web3.eth.getTransactionReceipt(self.tx_hash)
+
+        if tx_receipt.get('status') == 0:
+            self.status = self.Status.FAILED
+            self.error_message = 'reverted'
+            logging.info(f'TRANSFER CONFIRMATION: Transfer {self.tx_hash} reverted')
+        else:
+            self.status = self.Status.COMPLETED
+            logging.info(f'TRANSFER CONFIRMATION: Transfer {self.tx_hash} completed')
+
+        self.save()
+
+    def tx_confirm_btc(self):
+        if self.status == self.Status.COMPLETED:
+            logging.info(f'WITHDRAW CONFIRMATION: Token transfer already validated (tx: {self.tx_hash})')
+            return
+
+        api = BitcoinAPI()
+
+        confirmations = api.get_tx_confirmations(self.tx_hash)
+        if confirmations > 3:
+            self.status = self.Status.COMPLETED
+            logging.info(f'TRANSFER CONFIRMATION: Transfer {self.tx_hash} completed')
+
+        self.save()

@@ -158,3 +158,15 @@ class BitcoinAPI:
             address_found = True
 
         return return_address, address_found
+
+    def get_tx_confirmations(self, tx_hash):
+        endpoint_url = f'{self.base_url}/tx/{tx_hash}'
+        res = requests.get(endpoint_url)
+        if not res.ok:
+            return '', False
+        else:
+            tx_info = res.json()
+
+        confirmations = tx_info.get('confirmations')
+        return confirmations
+

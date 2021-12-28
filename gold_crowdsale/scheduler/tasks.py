@@ -9,6 +9,7 @@ from gold_crowdsale.settings import DEFAULT_TIME_FORMAT
 from gold_crowdsale.rates.models import create_rate_obj
 from gold_crowdsale.rates.serializers import UsdRateSerializer
 from gold_crowdsale.transfers.models import TokenTransfer
+from gold_crowdsale.withdrawals.models import WithdrawTransaction
 
 
 @dramatiq.actor(max_retries=0)
@@ -50,3 +51,33 @@ def process_transfer(transfer_id):
     except OperationalError as e:
         logging.error(f'PROCESS TRANSFER ERROR: failed process id {transfer_id} with error: {e}')
         pass
+
+
+def process_withdrawal(withdraw_id):
+    try:
+        with transaction.atomic():
+            withdraw = WithdrawTransaction.objects.select_for_update(nowait=True).get(id=withdraw_id)
+            if withdraw.status == WithdrawTransaction.Status.CREATED:
+                withdraw.process_selector()
+            elif withdraw.status == WithdrawTransaction.Status.PENDING:
+                withdraw.confirm_selector()
+
+    except OperationalError as e:
+        logging.error(f'PROCESS TRANSFER ERROR: failed process id {withdraw_id} with error: {e}')
+        pass
+
+
+def select_withdrawals(*status_list):
+    withdrawals = WithdrawTransaction.objects.filter(status__in=status_list)
+    for withdrawal in withdrawals:
+        process_withdrawal(withdrawal.id)
+
+
+@dramatiq.actor(max_retries=0)
+def select_created_withdrawals():
+    select_withdrawals(WithdrawTransaction.Status.CREATED)
+
+
+@dramatiq.actor(max_retries=0)
+def select_pending_withdrawals():
+    select_withdrawals(WithdrawTransaction.Status.PENDING)
