@@ -5,6 +5,8 @@ APScheduler==3.8.1
 asgiref==3.4.1
 async-timeout==4.0.1
 attrs==21.2.0
+backports.entry-points-selectable==1.1.1
+backports.zoneinfo==0.2.1
 base58==2.1.1
 bip32utils==0.3.post4
 bitarray==1.2.2
@@ -25,6 +27,7 @@ Django==3.2.9
 django-dramatiq==0.10.0
 django-extensions==3.1.5
 djangorestframework==3.12.4
+djangorestframework-api-key==2.1.0
 dramatiq==1.12.0
 drf-yasg==1.20.0
 ecdsa==0.17.0
@@ -67,6 +70,7 @@ pastel==0.2.1
 pexpect==4.8.0
 pika==1.2.0
 pkginfo==1.7.1
+platformdirs==2.4.1
 poetry==1.1.7
 poetry-core==1.0.3
 prometheus-client==0.12.0

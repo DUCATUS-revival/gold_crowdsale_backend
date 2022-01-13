@@ -6,12 +6,15 @@ from rest_framework import status
 from rest_framework.views import APIView
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
+from rest_framework_api_key.permissions import HasAPIKey
 
 from .models import create_transfer
 from .serializers import FiatTokenPurchaseSerializer
 
 
 class FiatTransferView(APIView):
+    permission_classes = [HasAPIKey]
+
     @swagger_auto_schema(
         operation_description="post ducx address, amount and api-key to send tokens from fiat",
         request_body=openapi.Schema(
