@@ -88,9 +88,10 @@ class TokenTransfer(models.Model):
 
         w3, gold_token_contract = load_w3_and_contract()
 
+        relay_address = NETWORKS.get('DUCX').get('relay_address')
         relay_tx_params = {
             'nonce': w3.eth.get_transaction_count(
-                w3.toChecksumAddress(NETWORKS.get('DUCX').get('relay_address')),
+                w3.toChecksumAddress(relay_address),
                 'pending'
             ),
             'gas': NETWORKS.get('DUCX').get('relay_gas_limit'),
@@ -105,6 +106,13 @@ class TokenTransfer(models.Model):
             self.status = self.Status.FAILED
             self.error_message = e
             return
+
+        # Check amount
+        relayer_balance = gold_token_contract.functions.balanceOf(relay_address).call()
+        if self.amount > relayer_balance:
+            logging.error(f'TRANSFER ERROR: Relayer balance too low: {relayer_balance} to transfer {self.amount} GOLD')
+            return
+
 
         transfer_tx = gold_token_contract.functions.transfer(user_address, int(self.amount))
         built_tx = transfer_tx.buildTransaction(relay_tx_params)
