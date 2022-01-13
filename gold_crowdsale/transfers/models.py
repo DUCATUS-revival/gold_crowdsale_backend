@@ -22,7 +22,16 @@ def load_w3_and_contract():
     return w3, gold_token_contract
 
 
-def create_transfer(token_purchase):
+def create_transfer(token_purchase, is_fiat=False, fiat_params=None):
+    if is_fiat and fiat_params is not None:
+        gold_token_amount = fiat_params.get('token_amount')
+        address_to_send = fiat_params.get('address_to_send')
+
+        token_transfer = TokenTransfer(
+            amount=gold_token_amount,
+            address_fo_from_fiat=address_to_send
+        )
+        token_transfer.save()
     try:
         rate_object = UsdRate.objects.order_by('creation_datetime').last()
         if not rate_object:
@@ -62,8 +71,15 @@ class TokenTransfer(models.Model):
     error_message = models.TextField(default='', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Fiat payment view support
+    is_fiat = models.BooleanField(default=False)
+    address_to_from_fiat = models.CharField(max_length=100, null=True)
+
     def get_user_address(self):
-        return self.token_purchase.user_address
+        if self.is_fiat:
+            return self.address_to_from_fiat
+        else:
+            return self.token_purchase.user_address
 
     def send_to_user(self):
         if self.status == self.Status.COMPLETED and self.tx_hash is not None:
@@ -81,7 +97,15 @@ class TokenTransfer(models.Model):
             'gasPrice': NETWORKS.get('DUCX').get('relay_gas_price')
         }
 
-        user_address = w3.toChecksumAddress(self.token_purchase.user_address)
+        try:
+            user_address = w3.toChecksumAddress(self.get_user_address())
+        except Exception as e:
+            logging.error(f'TRANSFER ERROR: Could not parse user address ({self.get_user_address()} because: {e}')
+            logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
+            self.status = self.Status.FAILED
+            self.error_message = e
+            return
+
         transfer_tx = gold_token_contract.functions.transfer(user_address, int(self.amount))
         built_tx = transfer_tx.buildTransaction(relay_tx_params)
         signed_tx = w3.eth.account.sign_transaction(built_tx, private_key=NETWORKS.get('DUCX').get('relay_privkey'))

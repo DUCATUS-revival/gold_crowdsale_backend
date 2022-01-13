@@ -43,7 +43,7 @@ def parse_payment_message(message):
                      f'for {int(payment.amount) / int(DECIMALS[payment.currency])} {payment.currency} '
                      f'successfully saved')
 
-        create_transfer(token_purchase)
+        create_transfer(token_purchase, is_fiat=False, fiat_params=None)
 
     else:
         logging.warning(f'PARSING PAYMENT: payment {tx_hash} already registered')
