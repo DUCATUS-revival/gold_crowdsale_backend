@@ -10,6 +10,7 @@ from drf_yasg.utils import swagger_auto_schema
 from .models import create_transfer
 from .serializers import FiatTokenPurchaseSerializer
 
+
 class FiatTransferView(APIView):
     @swagger_auto_schema(
         operation_description="post ducx address, amount and api-key to send tokens from fiat",
