@@ -27,11 +27,12 @@ class TokenPurchaseView(APIView):
     def post(self, request, *args, **kwargs):
         user_address = request.data.get('user_address')
 
-        if user_address.startswith('0x'):
-            try:
-                Web3.toChecksumAddress(user_address)
-            except:
-                return Response('invalid ethereum address', status=status.HTTP_400_BAD_REQUEST)
+        try:
+            Web3.toChecksumAddress(user_address)
+        except:
+            return Response(
+                {'error': 'invalid ducatusx address'},
+                status=status.HTTP_400_BAD_REQUEST)
 
         token_purchase, purchase_created = TokenPurchase.objects.get_or_create(user_address=user_address)
 
