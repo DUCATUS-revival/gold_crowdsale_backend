@@ -1,3 +1,6 @@
+import sys
+import traceback
+import logging
 from web3 import Web3
 
 from rest_framework import views
@@ -6,7 +9,8 @@ from rest_framework import status
 from rest_framework.views import APIView
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework_api_key.permissions import HasAPIKey
+
+from gold_crowdsale.api_auth.permissions import HasAPIKey
 
 from .models import create_transfer
 from .serializers import FiatTokenPurchaseSerializer
@@ -19,10 +23,11 @@ class FiatTransferView(APIView):
         operation_description="post ducx address, amount and api-key to send tokens from fiat",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=['user_address'],
+            required=['user_address', 'token_amount', 'api_key'],
             properties={
                 'user_address': openapi.Schema(type=openapi.TYPE_STRING),
-                'token_amount': openapi.Schema(type=openapi.TYPE_NUMBER)
+                'token_amount': openapi.Schema(type=openapi.TYPE_NUMBER),
+                'api_key': openapi.Schema(type=openapi.TYPE_STRING)
             },
         ),
         responses={"201": FiatTokenPurchaseSerializer()}
@@ -34,10 +39,14 @@ class FiatTransferView(APIView):
         try:
             Web3.toChecksumAddress(user_address)
         except:
-            return Response('invalid ethereum address', status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'invalid ethereum address'},
+                status=status.HTTP_400_BAD_REQUEST)
 
         if token_amount == 0:
-            return Response('token amount is zero', status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'token amount is zero'},
+                status=status.HTTP_400_BAD_REQUEST)
 
         fiat_params = {
             'address_to_send': user_address,
@@ -47,7 +56,11 @@ class FiatTransferView(APIView):
         try:
             token_transfer = create_transfer(None, True, fiat_params)
         except Exception as e:
-            return Response('could not create transfer', status=status.HTTP_400_BAD_REQUEST)
+            logging.error(f'Could not create transfer because: {e}')
+            logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
+            return Response(
+                {'error': 'could not create transfer'},
+                status=status.HTTP_400_BAD_REQUEST)
 
         transfer_serialized = FiatTokenPurchaseSerializer(token_transfer)
 

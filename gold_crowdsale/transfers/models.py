@@ -29,9 +29,12 @@ def create_transfer(token_purchase, is_fiat=False, fiat_params=None):
 
         token_transfer = TokenTransfer(
             amount=gold_token_amount,
-            address_fo_from_fiat=address_to_send
+            address_to_from_fiat=address_to_send,
+            is_fiat=True
         )
         token_transfer.save()
+        return token_transfer
+
     try:
         rate_object = UsdRate.objects.order_by('creation_datetime').last()
         if not rate_object:
@@ -113,7 +116,6 @@ class TokenTransfer(models.Model):
             logging.error(f'TRANSFER ERROR: Relayer balance too low: {relayer_balance} to transfer {self.amount} GOLD')
             return
 
-
         transfer_tx = gold_token_contract.functions.transfer(user_address, int(self.amount))
         built_tx = transfer_tx.buildTransaction(relay_tx_params)
         signed_tx = w3.eth.account.sign_transaction(built_tx, private_key=NETWORKS.get('DUCX').get('relay_privkey'))
@@ -122,7 +124,7 @@ class TokenTransfer(models.Model):
             sent_tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction).hex()
             self.status = self.Status.PENDING
             logging.info(f'TRANSFER DONE: success sending {int(self.amount / DECIMALS["GOLD"])} GOLD'
-                         f'tokens to {self.token_purchase.user_address}')
+                         f'tokens to {user_address}')
         except Exception as e:
             logging.error(f'TRANSFER ERROR: Could not relay token transfer tx: {e}')
             logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))

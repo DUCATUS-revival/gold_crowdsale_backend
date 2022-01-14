@@ -41,7 +41,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'rest_framework_api_key',
     'drf_yasg',
     'django_extensions',
     'django_dramatiq',
@@ -49,7 +48,8 @@ INSTALLED_APPS = [
     'gold_crowdsale.payments',
     'gold_crowdsale.transfers',
     'gold_crowdsale.rates',
-    'gold_crowdsale.scheduler'
+    'gold_crowdsale.scheduler',
+    'gold_crowdsale.api_auth'
 ]
 
 MIDDLEWARE = [
