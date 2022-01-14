@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     'gold_crowdsale.payments',
     'gold_crowdsale.transfers',
     'gold_crowdsale.rates',
-    'gold_crowdsale.scheduler'
+    'gold_crowdsale.scheduler',
+    'gold_crowdsale.api_auth'
 ]
 
 MIDDLEWARE = [
