@@ -55,7 +55,7 @@ def create_withdraw_cycle(currencies=None):
                     withdraw_cycle=cycle,
                     account=account,
                     currency='ETH',
-                    gas_tx_amount=1,
+                    gas_tx_count=1,
                     tx_type=WithdrawTransaction.TransactionType.GAS_REFILL
                 )
                 gas_tx.save()
