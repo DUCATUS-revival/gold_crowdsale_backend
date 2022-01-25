@@ -86,8 +86,13 @@ class TokenTransfer(models.Model):
             return self.token_purchase.user_address
 
     def send_to_user(self):
-        if self.status == self.Status.COMPLETED and self.tx_hash is not None:
-            logging.info(f'Token transfer already processed (tx: {self.tx_hash})')
+        if self.status != self.Status.CREATED:
+            logging.info(f'Token transfer {self.id} already processed (status: {self.status}, hash: {self.tx_hash})')
+            return
+
+        transfer_manager_set = self.transfertransactionmanager_set.filter(tx_to_process_id=self.id)
+        if not transfer_manager_set:
+            logging.info(f'TRANSFER: Transfer with id {self.id} postponed due multiple txes in queue')
             return
 
         w3, gold_token_contract = load_gold_token()
@@ -157,3 +162,32 @@ class TokenTransfer(models.Model):
             logging.info(f'TRANSFER CONFIRMATION: Transfer {self.tx_hash} completed')
 
         self.save()
+
+
+class TransferTransactionManager(models.Model):
+    tx_to_process = models.ForeignKey(TokenTransfer, on_delete=models.CASCADE, null=True, default=None)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_current_tx_finished(self):
+        if not self.tx_to_process:
+            return True
+
+        return self.tx_to_process.status != TokenTransfer.Status.PENDING
+
+    def get_remaining_txes(self):
+        transfers = TokenTransfer.objects.filter(
+            status=TokenTransfer.Status.CREATED
+        ).order_by('id')
+        return transfers
+
+    def set_next_tx(self):
+        if not self.is_current_tx_finished():
+            return
+
+        pending_transfers = self.get_remaining_txes()
+        new_tx = pending_transfers.first() if pending_transfers else None
+
+        # to escape unnecessary saves to db
+        if self.tx_to_process != new_tx:
+            self.tx_to_process = new_tx
+            self.save()

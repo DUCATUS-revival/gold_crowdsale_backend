@@ -12,5 +12,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         create_withdraw_cycle(options['currencies'])
-        logging.info('Started preparing withdraw cycle for BTC')
+        logging.info(f'Started preparing withdraw cycle for currencies: {options["currencies"]}')
 

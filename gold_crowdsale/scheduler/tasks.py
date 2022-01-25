@@ -3,13 +3,14 @@ import logging
 import traceback
 import dramatiq
 
-from django.db import transaction, OperationalError
-
+from gold_crowdsale.scheduler.transfers import select_transfers
+from gold_crowdsale.scheduler.withdrawals import select_withdrawals, select_withdraw_cycles
+from gold_crowdsale.scheduler.queues import select_transfer_queue, select_withdraw_queue
 from gold_crowdsale.settings import DEFAULT_TIME_FORMAT
 from gold_crowdsale.rates.models import create_rate_obj
 from gold_crowdsale.rates.serializers import UsdRateSerializer
 from gold_crowdsale.transfers.models import TokenTransfer
-from gold_crowdsale.withdrawals.models import WithdrawTransaction
+from gold_crowdsale.withdrawals.models import TransactionManager, WithdrawTransaction, WithdrawCycle
 
 
 @dramatiq.actor(max_retries=0)
@@ -33,51 +34,37 @@ def select_pending_transfers():
     select_transfers(TokenTransfer.Status.PENDING)
 
 
-def select_transfers(*status_list):
-    transfers = TokenTransfer.objects.filter(status__in=status_list)
-    for transfer in transfers:
-        process_transfer(transfer.id)
-
-
-def process_transfer(transfer_id):
-    try:
-        with transaction.atomic():
-            token_transfer = TokenTransfer.objects.select_for_update(nowait=True).get(id=transfer_id)
-            if token_transfer.status == TokenTransfer.Status.CREATED:
-                token_transfer.send_to_user()
-            elif token_transfer.status == TokenTransfer.Status.PENDING:
-                token_transfer.validate_receipt()
-
-    except OperationalError as e:
-        logging.error(f'PROCESS TRANSFER ERROR: failed process id {transfer_id} with error: {e}')
-        pass
-
-
-def process_withdrawal(withdraw_id):
-    try:
-        with transaction.atomic():
-            withdraw = WithdrawTransaction.objects.select_for_update(nowait=True).get(id=withdraw_id)
-            if withdraw.status == WithdrawTransaction.Status.CREATED:
-                withdraw.process_selector()
-            elif withdraw.status == WithdrawTransaction.Status.PENDING:
-                withdraw.confirm_selector()
-
-    except OperationalError as e:
-        logging.error(f'PROCESS TRANSFER ERROR: failed process id {withdraw_id} with error: {e}')
-        pass
-
-
-def select_withdrawals(*status_list):
-    withdrawals = WithdrawTransaction.objects.filter(status__in=status_list)
-    for withdrawal in withdrawals:
-        process_withdrawal(withdrawal.id)
-
-
 @dramatiq.actor(max_retries=0)
-def select_created_withdrawals():
-    select_withdrawals(WithdrawTransaction.Status.CREATED)
+def select_processing_withdrawals():
+    select_withdrawals(
+        WithdrawTransaction.Status.CREATED,
+        WithdrawTransaction.Status.PENDING,
+        WithdrawTransaction.Status.WAITING_FOR_ERC20_TRANSFERS,
+        WithdrawTransaction.Status.WAITING_FOR_GAS_REFILL
+    )
 
 
 @dramatiq.actor(max_retries=0)
 def select_pending_withdrawals():
     select_withdrawals(WithdrawTransaction.Status.PENDING)
+
+
+@dramatiq.actor(max_retries=0)
+def select_pending_withdraw_cycles():
+    select_withdraw_cycles(WithdrawCycle.Status.PENDING)
+
+
+@dramatiq.actor(max_retries=0)
+def select_erc20_withdraw_queues():
+    select_withdraw_queue(TransactionManager.QueueType.ERC20)
+
+
+@dramatiq.actor(max_retries=0)
+def select_gas_refill_withdraw_queues():
+    select_withdraw_queue(TransactionManager.QueueType.GAS_REFILL)
+
+
+@dramatiq.actor(max_retries=0)
+def select_pending_transfer_queue():
+    select_transfer_queue()
+

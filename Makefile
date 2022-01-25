@@ -1,6 +1,8 @@
 include .env
 compose_file := docker-compose.yml
+compose_file_kibana := docker-compose.elk.yml
 compose := docker-compose -f $(compose_file)
+compose_kibana := docker-compose -f $(compose_file_kibana)
 
 build:
 	$(compose) build --parallel
@@ -14,6 +16,12 @@ up: build
 down:
 	$(compose) down
 
+up_kibana:
+	$(compose_kibana) up -d
+
+down_kibana:
+	$(compose_kibana) down
+
 make_all_migrations:
 	$(compose) exec web python manage.py makemigrations payments purchases rates transfers api_auth withdrawals
 
@@ -25,6 +33,9 @@ shell:
 
 ps:
 	$(compose) ps -a $(service)
+
+ps_kibana:
+	$(compose_kibana) ps -a $(service)
 
 logs:
 	$(compose) logs -f $(service)

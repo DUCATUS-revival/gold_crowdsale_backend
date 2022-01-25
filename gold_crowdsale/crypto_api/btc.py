@@ -1,6 +1,10 @@
+import sys
 import json
 import time
 import requests
+import logging
+import traceback
+
 from bitcoinrpc.authproxy import AuthServiceProxy
 
 from gold_crowdsale.settings import NETWORKS, DECIMALS
@@ -22,7 +26,6 @@ class BitcoinRPC:
             host=NETWORKS.get('BTC').get('host'),
             port=NETWORKS.get('BTC').get('port'),
         )
-        # print(self.endpoint)
         return
 
     def establish_connection(self):
@@ -58,11 +61,11 @@ class BitcoinRPC:
 
         try:
             tx_hash = self.send_raw_transaction(signed['hex'])
-            print('tx', tx_hash, flush=True)
+            logging.info(f'tx: {tx_hash}')
             return tx_hash, True
         except Exception as e:
-            print('FAILED SENDING TRANSACTION', flush=True)
-            print(e, flush=True)
+            logging.error(f'FAILED SENDING TRANSACTION: {e}')
+            logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
             return e, False
 
     def validateaddress(self, address):
@@ -91,7 +94,7 @@ class BitcoinAPI:
         else:
             valid_json = len(res.json()) > 0
             if not valid_json:
-                print('Address have no transactions and balance is 0', flush=True)
+                logging.info('Address have no transactions and balance is 0')
                 return [], True
 
             return res.json(), True

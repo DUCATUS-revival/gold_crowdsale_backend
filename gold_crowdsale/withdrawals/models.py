@@ -1,16 +1,21 @@
-import sys
 import logging
+import sys
 import traceback
-from eth_account import Account
+from datetime import timedelta
 
 from django.db import models
+from django.utils import timezone
+from eth_account import Account
+from web3.exceptions import TransactionNotFound
 
-from gold_crowdsale.settings import MAX_AMOUNT_LEN, NETWORKS, DECIMALS, ROOT_KEYS
-from gold_crowdsale.crypto_api.eth import load_w3, load_eth_erc20_token
+from .utils import get_private_keys, normalize_gas_price
 from gold_crowdsale.crypto_api.btc import BitcoinAPI, BitcoinRPC
-from gold_crowdsale.rates.models import get_rate_object
+from gold_crowdsale.crypto_api.eth import load_w3, load_eth_erc20_token
+
 from gold_crowdsale.purchases.models import TokenPurchase
-from gold_crowdsale.withdrawals.utils import get_private_keys, normalize_gas_price
+from gold_crowdsale.rates.models import get_rate_object
+from gold_crowdsale.settings import MAX_AMOUNT_LEN, ROOT_KEYS, NETWORKS, DECIMALS
+
 
 ERC20_CURRENCIES = ['USDT', 'USDC']
 NATIVE_CURRENCIES = ['ETH', 'BTC']
@@ -33,7 +38,8 @@ def create_withdraw_cycle(currencies=None):
 
     currencies.sort()
     cycle = WithdrawCycle.objects.create(
-        currencies=str(currencies)
+        currencies=str(currencies),
+        status=WithdrawCycle.Status.CREATED,
     )
     cycle.save()
 
@@ -41,14 +47,14 @@ def create_withdraw_cycle(currencies=None):
 
     for account in all_purchases:
         for currency in currencies:
-            main_tx_initial_status = WithdrawTransaction.Status.CREATED
+            withdraw_initial_status = WithdrawTransaction.Status.CREATED
 
             if currency == 'ETH':
                 erc20_txes = [x for x in currencies if x not in NATIVE_CURRENCIES]
                 if len(erc20_txes) == 0:
                     continue
 
-                main_tx_initial_status = WithdrawTransaction.Status.WAITING_FOR_ERC20_TRANSFERS
+                withdraw_initial_status = WithdrawTransaction.Status.WAITING_FOR_ERC20_TRANSFERS
 
             elif currency in ERC20_CURRENCIES:
                 gas_tx, created = WithdrawTransaction.objects.get_or_create(
@@ -64,7 +70,20 @@ def create_withdraw_cycle(currencies=None):
                     gas_tx.gas_tx_count += 1
                     gas_tx.save()
 
-                main_tx_initial_status = WithdrawTransaction.Status.WAITING_FOR_GAS_REFILL
+                withdraw_initial_status = WithdrawTransaction.Status.WAITING_FOR_GAS_REFILL
+
+                # Create account queue for ERC20 withdrawals
+                TransactionManager.objects.get_or_create(
+                    withdraw_cycle=cycle,
+                    account=account,
+                    queue_type=TransactionManager.QueueType.ERC20
+                )
+
+                # Create global queue for gas refills
+                TransactionManager.objects.get_or_create(
+                    withdraw_cycle=cycle,
+                    queue_type=TransactionManager.QueueType.GAS_REFILL
+                )
 
             if currency in NATIVE_CURRENCIES:
                 main_tx_type = WithdrawTransaction.TransactionType.NATIVE
@@ -75,14 +94,39 @@ def create_withdraw_cycle(currencies=None):
                 withdraw_cycle=cycle,
                 account=account,
                 currency=currency,
-                status=main_tx_initial_status,
+                status=withdraw_initial_status,
                 tx_type=main_tx_type
             )
 
+    cycle.status = WithdrawCycle.Status.PENDING
+    cycle.save()
+
 
 class WithdrawCycle(models.Model):
+    class Status(models.TextChoices):
+        CREATED = 'created'
+        PENDING = 'pending'
+        COMPLETED = 'completed'
+
     created_at = models.DateTimeField(auto_now_add=True)
     currencies = models.CharField(max_length=120, null=True, default=None)
+    status = models.CharField(max_length=50, choices=Status.choices, default=Status.CREATED)
+
+    def check_for_completion(self):
+        ongoing_tx_statuses = [
+            WithdrawTransaction.Status.CREATED,
+            WithdrawTransaction.Status.PENDING,
+            WithdrawTransaction.Status.WAITING_FOR_ERC20_TRANSFERS,
+            WithdrawTransaction.Status.WAITING_FOR_GAS_REFILL
+        ]
+        transactions = self.withdrawtransaction_set.filter(status__in=ongoing_tx_statuses)
+
+        if transactions.count() > 0:
+            return
+        else:
+            logging.info(f'Withdraw cycle {self.id} is finished')
+            self.status = self.Status.COMPLETED
+            self.save()
 
 
 class WithdrawTransaction(models.Model):
@@ -90,13 +134,13 @@ class WithdrawTransaction(models.Model):
     class Status(models.TextChoices):
         CREATED = 'created'
         PENDING = 'pending'
+        WAITING_FOR_ERC20_TRANSFERS = 'waiting_for_erc20_transfers'
+        WAITING_FOR_GAS_REFILL = 'waiting_for_gas_refill'
         COMPLETED = 'completed'
         SKIPPED = 'skipped'
         FAILED = 'failed'
-        WAITING_FOR_ERC20_TRANSFERS = 'waiting_for_erc20_transfers'
-        WAITING_FOR_GAS_REFILL = 'waiting_for_gas_refill'
+        SENT_TX_NOT_FOUND = 'sent_tx_not_found'
         ERC20_BALANCE_TOO_LOW = 'erc20_balance_too_low'
-        ERC20_TX_REVERTED = 'erc20_tx_reverted'
 
     class TransactionType(models.TextChoices):
         NATIVE = 'native'
@@ -114,6 +158,7 @@ class WithdrawTransaction(models.Model):
     gas_price_erc20 = models.DecimalField(max_digits=MAX_AMOUNT_LEN, decimal_places=0, null=True, default=None)
     error_message = models.TextField(default='', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    relayed_at = models.DateTimeField(null=True, default=None)
 
     def process_selector(self):
         if self.tx_type == self.TransactionType.GAS_REFILL:
@@ -162,6 +207,8 @@ class WithdrawTransaction(models.Model):
         transaction_fee = rpc.relay_fee
         if balance < transaction_fee:
             logging.info(f'Address skipped: {from_address}: balance {balance} < tx fee of {transaction_fee}')
+            self.status = self.Status.SKIPPED
+            self.save()
             return
 
         withdraw_amount = (balance - transaction_fee) / DECIMALS['BTC']
@@ -177,6 +224,7 @@ class WithdrawTransaction(models.Model):
         if send_success:
             self.tx_hash = tx_hash_or_error_msg
             self.status = self.Status.PENDING
+            self.relayed_at = timezone.now()
             self.save()
             logging.info(f'Withdraw BTC tx sent: {self.tx_hash}')
         else:
@@ -190,6 +238,19 @@ class WithdrawTransaction(models.Model):
     def process_gas_refill(self):
         if self.currency != 'ETH' and self.tx_type != self.TransactionType.GAS_REFILL:
             logging.error(f'Gas refill processing called on tx with currency {self.currency} and type {self.tx_type}')
+            return
+
+        if self.status != self.Status.CREATED:
+            logging.error(f'WITHDRAWAL: id {self.id} already processed or processing in progress {self.status}')
+            return
+
+        refill_queue_manager_set = self.transactionmanager_set.filter(
+            withdraw_cycle=self.withdraw_cycle,
+            queue_type=self.tx_type,
+            tx_to_process_id=self.id
+        )
+        if not refill_queue_manager_set:
+            logging.info(f'TRANSFER: Transfer with id {self.id} postponed due multiple txes in queue')
             return
 
         web3 = load_w3('ETH')
@@ -224,6 +285,7 @@ class WithdrawTransaction(models.Model):
             )
             total_erc20_balances_in_eth += token_balance_in_eth
             token_withdrawal.amount = token_balance
+            token_withdrawal.gas_price_erc20 = gas_price
             token_withdrawal.save()
 
         total_gas_refill_cost = refill_gas_fee + erc20_gas_fee
@@ -232,14 +294,19 @@ class WithdrawTransaction(models.Model):
                          f'tokens value in ETH {total_erc20_balances_in_eth}  < tx fee of {total_gas_refill_cost}')
             self.status = self.Status.ERC20_BALANCE_TOO_LOW
             self.save()
+
+            for token_withdrawal in erc20_withdrawals:
+                token_withdrawal.status = self.Status.SKIPPED
+                token_withdrawal.save()
+
             return
 
         address_to_refill_balance = web3.eth.getBalance(web3.toChecksumAddress(address_to_refill))
 
-        if address_to_refill_balance < int(erc20_gas_fee * 1.1):
+        if address_to_refill_balance > int(erc20_gas_fee * 1.1):
             logging.info(f'Refill on address {address_to_refill} skipped: '
-                         f'Current address balance {address_to_refill_balance} < {int(erc20_gas_fee * 1.1)} '
-                         f'and is not enough for withdrawing ERC20 tokens')
+                         f'Current address balance {address_to_refill_balance} > {int(erc20_gas_fee * 1.1)} '
+                         f'and is enough for withdrawing ERC20 tokens')
             self.status = self.Status.SKIPPED
             self.save()
             return
@@ -264,10 +331,11 @@ class WithdrawTransaction(models.Model):
         signed_tx = Account.signTransaction(gas_tx_params, priv_key)
 
         try:
-            sent_tx = web3.eth.sendRawTransaction(signed_tx.get('rawTransaction'))
+            sent_tx = web3.eth.sendRawTransaction(signed_tx['rawTransaction'])
             self.status = self.Status.PENDING
             self.tx_hash = sent_tx.hex()
-            self.gas_tx_count = gas_price
+            self.gas_price_erc20 = gas_price
+            self.relayed_at = timezone.now()
             self.save()
             logging.info(f'Refill tx sent: {self.tx_hash}')
         except Exception as e:
@@ -282,9 +350,20 @@ class WithdrawTransaction(models.Model):
             logging.error(f'ERC20 processing called on tx with currency {self.currency} and type {self.tx_type}')
             return
 
+        erc20_processing_statuses = [
+            self.Status.CREATED,
+            self.Status.WAITING_FOR_GAS_REFILL,
+            self.Status.WAITING_FOR_ERC20_TRANSFERS
+        ]
+
+        if self.status not in erc20_processing_statuses:
+            logging.error(f'WITHDRAWAL: id {self.id} already processed or processing in progress {self.status}')
+            return
+
         refill_transaction = WithdrawTransaction.objects.filter(
             withdraw_cycle=self.withdraw_cycle,
-            account=self.account
+            account=self.account,
+            tx_type=self.TransactionType.GAS_REFILL
         )
 
         if not refill_transaction:
@@ -295,16 +374,28 @@ class WithdrawTransaction(models.Model):
         else:
             refill_transaction = refill_transaction.get()
 
-        valid_refill_statuses = [
-            self.Status.COMPLETED,
-            self.Status.SKIPPED
-        ]
-
-        if refill_transaction.status is self.Status.FAILED:
+        if refill_transaction.status == self.Status.FAILED:
+            logging.info(f'Withdraw {self.currency}: id {self.id} skipped - refill transaction failed')
             self.status = self.Status.SKIPPED
             self.save()
             return
-        elif refill_transaction.status not in valid_refill_statuses:
+        elif refill_transaction.status not in [self.Status.COMPLETED, self.Status.SKIPPED]:
+            logging.info(f'WITHDRAW {self.currency}: id {self.id} postponed - Refill transaction is not completed yet')
+            return
+
+        erc20_queue_manager_set = self.transactionmanager_set.filter(
+            withdraw_cycle=self.withdraw_cycle,
+            queue_type=self.tx_type,
+            account=self.account,
+            tx_to_process_id=self.id
+        )
+        if self.status in erc20_processing_statuses[1:] and not erc20_queue_manager_set:
+            logging.info(f'Withdraw {self.id} delayed because other ERC20 withdrawals in queue')
+
+            if self.status == self.Status.WAITING_FOR_GAS_REFILL:
+                self.status = self.Status.WAITING_FOR_ERC20_TRANSFERS
+                self.save()
+
             return
 
         web3, token_contract = load_eth_erc20_token(self.currency)
@@ -333,6 +424,7 @@ class WithdrawTransaction(models.Model):
             sent_tx = web3.eth.sendRawTransaction(signed_tx['rawTransaction'])
             self.tx_hash = sent_tx.hex()
             self.status = self.Status.PENDING
+            self.relayed_at = timezone.now()
             self.save()
             logging.info(f'Withdraw {self.currency} tx sent: {self.tx_hash}')
         except Exception as e:
@@ -344,21 +436,26 @@ class WithdrawTransaction(models.Model):
 
     def process_withdraw_eth(self):
         if self.currency != 'ETH' and self.tx_type != self.TransactionType.NATIVE:
-            logging.error(f'ETH processing called on tx with currency {self.currency} and type {self.tx_type}')
+            logging.error(f'WITHDRAWAL: ETH processing called on tx with '
+                          f'currency {self.currency} and type {self.tx_type}')
             return
-
-        allowed_statuses = [
-            self.Status.CREATED,
-            self.Status.WAITING_FOR_ERC20_TRANSFERS,
-        ]
-
-        if self.status not in allowed_statuses:
-            logging.error('Already processed or processing in progress')
+        if self.status not in [self.Status.CREATED, self.Status.WAITING_FOR_ERC20_TRANSFERS]:
+            logging.error(f'WITHDRAWAL: id {self.id} already processed or processing in progress {self.status}')
             return
-
         if self.status == self.Status.WAITING_FOR_ERC20_TRANSFERS:
-            logging.info('Skipping tx because waiting for ERC20 transfer')
-            return
+            # check erc20 tx statuses here
+            all_erc20_withdrawals = WithdrawTransaction.objects.filter(
+                withdraw_cycle=self.withdraw_cycle,
+                account=self.account,
+                tx_type=WithdrawTransaction.TransactionType.ERC20,
+            )
+
+            completed_erc20_txes = all_erc20_withdrawals.filter(
+                status__in=[WithdrawTransaction.Status.SKIPPED, WithdrawTransaction.Status.COMPLETED]
+            )
+            if completed_erc20_txes.count() < all_erc20_withdrawals.count():
+                logging.info('Delaying tx because waiting for ERC20 transfer')
+                return
 
         priv_key, _ = get_private_keys(ROOT_KEYS.get('private'), self.account.id)
         logging.info(f'ETH address: {self.account.eth_address}')
@@ -377,6 +474,8 @@ class WithdrawTransaction(models.Model):
 
         if balance < total_gas_fee:
             logging.info(f'Address {from_address} skipped: balance {balance} < tx fee of {total_gas_fee}')
+            self.status = self.Status.SKIPPED
+            self.save()
             return
 
         withdraw_amount = int(balance) - total_gas_fee
@@ -395,8 +494,14 @@ class WithdrawTransaction(models.Model):
         signed_tx = Account.signTransaction(tx_params, priv_key)
         try:
             sent_tx = web3.eth.sendRawTransaction(signed_tx['rawTransaction'])
+            self.status = self.Status.PENDING
+            self.tx_hash = sent_tx.hex()
+            self.relayed_at = timezone.now()
+            self.save()
             logging.info(f'Withdraw ETH sent tx: {sent_tx.hex()}')
         except Exception as e:
+            self.status = self.Status.FAILED
+            self.error_message = e
             err_str = f'Withdraw ETH failed for address {from_address} ' \
                       f'and amount {withdraw_amount} ({balance} - {total_gas_fee})'
             logging.error(err_str)
@@ -418,15 +523,19 @@ class WithdrawTransaction(models.Model):
             return
 
         web3 = load_w3('ETH')
-        tx_receipt = web3.eth.getTransactionReceipt(self.tx_hash)
+        try:
+            tx_receipt = web3.eth.getTransactionReceipt(self.tx_hash)
+        except TransactionNotFound:
+            self.check_confirmation_time(hours=2)
+            return
 
         if tx_receipt.get('status') == 0:
             self.status = self.Status.FAILED
             self.error_message = 'reverted'
-            logging.info(f'TRANSFER CONFIRMATION: Transfer {self.tx_hash} reverted')
+            logging.info(f'WITHDRAW CONFIRMATION: Withdraw {self.tx_hash} reverted')
         else:
             self.status = self.Status.COMPLETED
-            logging.info(f'TRANSFER CONFIRMATION: Transfer {self.tx_hash} completed')
+            logging.info(f'WITHDRAW CONFIRMATION: Withdraw {self.tx_hash} completed')
 
         self.save()
 
@@ -437,9 +546,90 @@ class WithdrawTransaction(models.Model):
 
         api = BitcoinAPI()
 
-        confirmations = api.get_tx_confirmations(self.tx_hash)
+        try:
+            confirmations = api.get_tx_confirmations(self.tx_hash)
+        except Exception as e:
+            logging.info(f'Exception when trying to get BTC confirmations: {e}')
+            logging.error('\n'.join(traceback.format_exception(*sys.exc_info())))
+            self.check_confirmation_time(hours=3)
+            return
+
         if confirmations > 3:
+            logging.info(f'WITHDRAW CONFIRMATION: Withdraw {self.tx_hash} completed')
             self.status = self.Status.COMPLETED
-            logging.info(f'TRANSFER CONFIRMATION: Transfer {self.tx_hash} completed')
+            self.save()
+
+    def check_confirmation_time(self, hours):
+        if timezone.now() < self.relayed_at + timedelta(hours=hours):
+            logging.info('Transaction not found, retrying')
+        else:
+            self.status = self.Status.SENT_TX_NOT_FOUND
+            self.save()
+
+
+class TransactionManager(models.Model):
+
+    class QueueType(models.TextChoices):
+        ERC20 = 'erc20'
+        GAS_REFILL = 'gas_refill'
+
+    withdraw_cycle = models.ForeignKey(WithdrawCycle, on_delete=models.CASCADE, null=True, default=None)
+    account = models.ForeignKey(TokenPurchase, on_delete=models.CASCADE, null=True, default=None)
+    tx_to_process = models.ForeignKey(WithdrawTransaction, on_delete=models.CASCADE, null=True, default=None)
+    queue_type = models.CharField(max_length=50, choices=QueueType.choices, default=QueueType.ERC20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed = models.BooleanField(default=False, null=True)
+
+    def is_current_tx_finished(self):
+        if not self.tx_to_process:
+            return True
+
+        return self.tx_to_process.status != WithdrawTransaction.Status.PENDING
+        # withdrawals = WithdrawTransaction.objects.filter(
+        #     withdraw_cycle=self.withdraw_cycle,
+        #     tx_type=self.queue_type,
+        #     status__in=[
+        #         WithdrawTransaction.Status.PENDING,
+        #     ]
+        # )
+        #
+        # if self.queue_type == self.QueueType.ERC20:
+        #     withdrawals = withdrawals.filter(account=self.account)
+        #
+        # return True if not withdrawals else False
+
+    def get_remaining_txes(self):
+        withdrawals = WithdrawTransaction.objects.filter(
+            withdraw_cycle=self.withdraw_cycle,
+            tx_type=self.queue_type,
+        )
+        if self.queue_type == self.QueueType.ERC20:
+            withdrawals = withdrawals.filter(
+                account=self.account,
+                status__in=[
+                    WithdrawTransaction.Status.CREATED,
+                    WithdrawTransaction.Status.WAITING_FOR_ERC20_TRANSFERS,
+                    WithdrawTransaction.Status.WAITING_FOR_GAS_REFILL
+                ]
+            ).order_by('currency')
+        else:
+            withdrawals = withdrawals.filter(status=WithdrawTransaction.Status.CREATED).order_by('account_id')
+
+        return withdrawals
+
+    def set_next_tx(self):
+        if self.completed:
+            logging.info(f'WITHDRAW QUEUE: Method to set next tx is called on id {self.id}, ignoring')
+            return
+
+        if not self.is_current_tx_finished():
+            return
+
+        remaining_withdrawals = self.get_remaining_txes()
+        if remaining_withdrawals:
+            self.tx_to_process = remaining_withdrawals.first()
+        else:
+            self.tx_to_process = None
+            self.completed = True
 
         self.save()
