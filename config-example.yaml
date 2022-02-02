@@ -1,3 +1,61 @@
 root_keys:
     public: "xpubkey"
     private: "xprivkey"
+
+networks:
+  BTC_TESTNET:
+    queue: exchange-bitcoin
+    user: 'bitcoin_user'
+    password: 'bitcoin_pwd'
+    host: '11.22.33.44'
+    port: '18332'
+    currency: 'BTC'
+    is_mainnet: False   # set to True if mainnet
+    withdraw_address: 'tb1...'
+  ETHEREUM_RINKEBY:
+    url: 'https://web3_provider'
+    queue: exchange-ethereum
+    # etherscan_api_key: 'api_key'
+    currency: 'ETH'
+    withdraw_address: '0x..'
+    gas_address: '0x..'
+    gas_privkey: 'priv'
+    usdt_token_address: '0xc1bB86e6859C370F981824f61Bd536eAAb484e5b'
+    usdc_token_address: '0x4dbcdf9b62e891a7cec5a2568c3f4faf9e8abe2b'
+
+  DUCATUSX_TESTNET:
+    url: 'https://web3_ducx_provider'
+    queue: exchange-ducatusx
+    currency: 'DUCX'
+    gold_token_address: '0x13D609C1b682f74BD3968C19f8967B7277879f4D'
+    relay_address: '0x..'
+    relay_privkey: 'privkey'
+    relay_gas_limit: 150000
+    relay_gas_price: 80000000000
+#  DUCATUSX_MAINNET:
+#    url: 'http://web3_ducx_main_provider'
+#    queue: exchange-ducatusx
+#    currency: 'DUCX'
+#    gold_token_address: '0x13D609C1b682f74BD3968C19f8967B7277879f4D'
+#    relay_address: '0x..'
+#    relay_privkey: 'privke'
+#    relay_gas_limit: 150000
+#    relay_gas_price: 80000000000
+
+rates_settings:
+  cryptocompare_url: 'https://cryptocompare_api'
+  cryptocompare_apikey: 'apikey'
+  gold_price: 0.1
+
+scheduler_settings:
+  accounts_task_interval: 60
+  accounts_drop_timeout: 10800
+  rates_interval: 60
+  transfer_relay_interval: 30
+  transfer_confirm_interval: 60
+  withdrawal_eth_backoff: 420
+  withdrawals_polling_interval: 60
+  withdrawals_confirm_interval: 60
+  withdrawal_cycles_polling_interval: 120
+  queues_polling_interval: 10
+
