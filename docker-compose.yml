@@ -15,7 +15,7 @@ services:
   web:
     container_name: web
     restart: unless-stopped
-    image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
+    image: ghcr.io/ducatusx/gold_crowdsale_backend:master
     build:
       context: .
       dockerfile: Dockerfile
@@ -30,7 +30,7 @@ services:
   scanner:
     container_name: scanner
     restart: unless-stopped
-    image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
+    image: ghcr.io/ducatusx/gold_crowdsale_backend:master
     build:
       context: .
       dockerfile: Dockerfile
@@ -45,7 +45,7 @@ services:
   receiver:
     container_name: receiver
     restart: unless-stopped
-    image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
+    image: ghcr.io/ducatusx/gold_crowdsale_backend:master
     build:
       context: .
       dockerfile: Dockerfile
@@ -59,7 +59,7 @@ services:
   dramatiq:
     container_name: dramatiq
     restart: unless-stopped
-    image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
+    image: ghcr.io/ducatusx/gold_crowdsale_backend:master
     build:
       context: .
       dockerfile: Dockerfile
@@ -74,7 +74,7 @@ services:
   scheduler:
     container_name: scheduler
     restart: unless-stopped
-    image: ghcr.io/ducatus-revival/gold_crowdsale_backend:master
+    image: ghcr.io/ducatusx/gold_crowdsale_backend:master
     env_file: .env
     build:
       context: .
