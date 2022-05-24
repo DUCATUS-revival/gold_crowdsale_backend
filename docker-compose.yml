@@ -1,19 +1,16 @@
 version: "3.8"
 services:
   db:
-    container_name: db
     image: postgres:13.4
     restart: unless-stopped
     env_file: .env
     volumes:
       - ./.docker/postgres-data:/var/lib/postgresql/data
   rabbitmq:
-    container_name: rabbitmq
     image: rabbitmq:3.8-management-alpine
     restart: unless-stopped
     env_file: .env
   web:
-    container_name: web
     restart: unless-stopped
     image: ghcr.io/ducatusx/gold_crowdsale_backend:master
     build:
@@ -28,7 +25,6 @@ services:
       - .:/code
     command: bash -c "python manage.py runserver 0.0.0.0:8000"
   scanner:
-    container_name: scanner
     restart: unless-stopped
     image: ghcr.io/ducatusx/gold_crowdsale_backend:master
     build:
@@ -43,7 +39,6 @@ services:
       - ./scanner/block_numbers:/code/scanner/block_numbers
     command: bash -c 'python scanner/main.py'
   receiver:
-    container_name: receiver
     restart: unless-stopped
     image: ghcr.io/ducatusx/gold_crowdsale_backend:master
     build:
@@ -57,7 +52,6 @@ services:
       - .:/code
     command: bash -c 'python receiver.py'
   dramatiq:
-    container_name: dramatiq
     restart: unless-stopped
     image: ghcr.io/ducatusx/gold_crowdsale_backend:master
     build:
@@ -72,7 +66,6 @@ services:
       - .:/code
     command: bash -c 'python manage.py rundramatiq'
   scheduler:
-    container_name: scheduler
     restart: unless-stopped
     image: ghcr.io/ducatusx/gold_crowdsale_backend:master
     env_file: .env
