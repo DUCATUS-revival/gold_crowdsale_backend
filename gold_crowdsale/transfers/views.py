@@ -7,13 +7,14 @@ from rest_framework import views
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 
 from gold_crowdsale.api_auth.permissions import HasAPIKey
 
-from .models import create_transfer
-from .serializers import FiatTokenPurchaseSerializer
+from .models import create_transfer, TokenTransfer
+from .serializers import FiatTokenPurchaseSerializer, FiatTxConfirmationSerializer
 
 
 class FiatTransferView(APIView):
@@ -65,3 +66,49 @@ class FiatTransferView(APIView):
         transfer_serialized = FiatTokenPurchaseSerializer(token_transfer)
 
         return Response(transfer_serialized.data, status=status.HTTP_201_CREATED)
+
+class FiatTransferTransactionsList(ListAPIView):
+    permission_classes = [HasAPIKey]
+    queryset = TokenTransfer.objects.filter(is_fiat=True)
+    serializer_class = FiatTxConfirmationSerializer
+
+    @swagger_auto_schema(
+        operation_description="retrieve all fiat transfers in list",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['api_key'],
+            properties={
+                'api_key': openapi.Schema(type=openapi.TYPE_STRING)
+            },
+        )
+    )
+    def post(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @swagger_auto_schema(auto_schema=None)
+    def get(self, request, *args, **kwargs):
+        pass
+
+class FiatTransferTransaction(RetrieveAPIView):
+    permission_classes = [HasAPIKey]
+    queryset = TokenTransfer.objects.filter(is_fiat=True)
+    serializer_class = FiatTxConfirmationSerializer
+    lookup_field = 'id'
+
+    @swagger_auto_schema(
+        operation_description="get fiat transfer info by id",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['api_key'],
+            properties={
+                'api_key': openapi.Schema(type=openapi.TYPE_STRING)
+            },
+        )
+    )
+    def post(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    @swagger_auto_schema(auto_schema=None)
+    def get(self, request, *args, **kwargs):
+        pass
+

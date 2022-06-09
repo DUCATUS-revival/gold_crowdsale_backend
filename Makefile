@@ -3,6 +3,7 @@ compose_file := docker-compose.yml
 compose_file_kibana := docker-compose.elk.yml
 compose := docker-compose -f $(compose_file)
 compose_kibana := docker-compose -f $(compose_file_kibana)
+service := web
 
 build:
 	$(compose) build --parallel
@@ -38,7 +39,7 @@ ps_kibana:
 	$(compose_kibana) ps -a $(service)
 
 logs:
-	$(compose) logs -f $(service)
+	$(compose) logs --tail 1000 -f $(service)
 
 remove_migrations:
 	bash -c "for file in $$(find gold_crowdsale -name 000*); do sudo rm -rf $$file; done"
