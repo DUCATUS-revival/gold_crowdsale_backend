@@ -80,7 +80,8 @@ class FiatTransferTransactionsList(ListAPIView):
             properties={
                 'api_key': openapi.Schema(type=openapi.TYPE_STRING)
             },
-        )
+        ),
+        responses={"200": FiatTxConfirmationSerializer()}
     )
     def post(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
@@ -103,7 +104,8 @@ class FiatTransferTransaction(RetrieveAPIView):
             properties={
                 'api_key': openapi.Schema(type=openapi.TYPE_STRING)
             },
-        )
+        ),
+        responses={"200": FiatTxConfirmationSerializer()}
     )
     def post(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
