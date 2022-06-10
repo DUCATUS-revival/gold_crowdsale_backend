@@ -6,7 +6,11 @@ from rest_framework import permissions
 
 from gold_crowdsale.purchases.views import TokenPurchaseView
 from gold_crowdsale.rates.views import UsdRateView
-from gold_crowdsale.transfers.views import FiatTransferView
+from gold_crowdsale.transfers.views import (
+    FiatTransferView,
+    FiatTransferTransactionsList,
+    FiatTransferTransaction
+)
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -24,6 +28,8 @@ urlpatterns = [
     path('api/v1/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('api/v1/purchases/', TokenPurchaseView.as_view()),
     path('api/v1/fiat-transfer/', FiatTransferView.as_view()),
+    path('api/v1/transactions/fiat/', FiatTransferTransactionsList.as_view()),
+    path('api/v1/transactions/fiat/<str:id>/', FiatTransferTransaction.as_view()),
     path('api/v1/usd_rates/', UsdRateView.as_view()),
 
 
