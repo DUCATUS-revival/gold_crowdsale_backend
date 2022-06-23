@@ -6,6 +6,10 @@ services:
     env_file: .env
     volumes:
       - ./.docker/postgres-data:/var/lib/postgresql/data
+  rabbitmq:
+    image: rabbitmq:3.8-management-alpine
+    restart: unless-stopped
+    env_file: .env
   web:
     restart: unless-stopped
     image: ghcr.io/ducatusx/gold_crowdsale_backend:master

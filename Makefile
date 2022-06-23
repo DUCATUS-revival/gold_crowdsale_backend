@@ -1,8 +1,8 @@
 include .env
 compose_file := docker-compose.yml
 compose_file_kibana := docker-compose.elk.yml
-compose := docker-compose -f $(compose_file)
-compose_kibana := docker-compose -f $(compose_file_kibana)
+compose := docker compose -f $(compose_file)
+compose_kibana := docker compose -f $(compose_file_kibana)
 service := web
 
 build:
