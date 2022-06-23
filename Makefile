@@ -14,6 +14,9 @@ up_db:
 up: build
 	$(compose) up -d
 
+up_from_image:
+	$(compose) up -d
+
 down:
 	$(compose) down
 
