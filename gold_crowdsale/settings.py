@@ -228,10 +228,7 @@ for net, value in CONFIG_NETWORKS.items():
     net_currency = value.get('currency')
     NETWORKS[net_currency] = value
 
-
+ROOT_KEYS = config_data.get('root_keys', None)
+RATES_SETTINGS = config_data.get('rates_settings', None)
 SCHEDULER_SETTINGS = config_data.get('scheduler_settings', None)
 FIAT_ONLY_MODE = config_data.get('fiat_only_mode', True)
-
-if not FIAT_ONLY_MODE:
-    ROOT_KEYS = config_data.get('root_keys', None)
-    RATES_SETTINGS = config_data.get('rates_settings', None)
