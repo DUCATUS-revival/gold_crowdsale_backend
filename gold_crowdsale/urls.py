@@ -11,6 +11,7 @@ from gold_crowdsale.transfers.views import (
     FiatTransferTransactionsList,
     FiatTransferTransaction
 )
+from gold_crowdsale.settings import FIAT_ONLY_MODE
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -26,11 +27,13 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('django-admin/', admin.site.urls),
     path('api/v1/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path('api/v1/purchases/', TokenPurchaseView.as_view()),
     path('api/v1/fiat-transfer/', FiatTransferView.as_view()),
     path('api/v1/transactions/fiat/', FiatTransferTransactionsList.as_view()),
     path('api/v1/transactions/fiat/<str:id>/', FiatTransferTransaction.as_view()),
     path('api/v1/usd_rates/', UsdRateView.as_view()),
-
-
 ]
+
+if not FIAT_ONLY_MODE:
+    urlpatterns += [
+        path('api/v1/purchases/', TokenPurchaseView.as_view()),
+    ]

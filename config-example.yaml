@@ -59,3 +59,4 @@ scheduler_settings:
   withdrawal_cycles_polling_interval: 120
   queues_polling_interval: 10
 
+fiat_only_mode: True

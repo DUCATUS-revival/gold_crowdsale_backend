@@ -231,3 +231,4 @@ for net, value in CONFIG_NETWORKS.items():
 
 
 SCHEDULER_SETTINGS = config_data.get('scheduler_settings', None)
+FIAT_ONLY_MODE = config_data.get('fiat_only_mode', True)
