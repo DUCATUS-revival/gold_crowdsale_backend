@@ -30,10 +30,10 @@ urlpatterns = [
     path('api/v1/fiat-transfer/', FiatTransferView.as_view()),
     path('api/v1/transactions/fiat/', FiatTransferTransactionsList.as_view()),
     path('api/v1/transactions/fiat/<str:id>/', FiatTransferTransaction.as_view()),
-    path('api/v1/usd_rates/', UsdRateView.as_view()),
 ]
 
 if not FIAT_ONLY_MODE:
     urlpatterns += [
+        path('api/v1/usd_rates/', UsdRateView.as_view()),
         path('api/v1/purchases/', TokenPurchaseView.as_view()),
     ]

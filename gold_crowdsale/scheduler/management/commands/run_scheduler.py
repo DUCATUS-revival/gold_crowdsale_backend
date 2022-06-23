@@ -22,13 +22,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE('Preparing scheduler'))
         scheduler = BlockingScheduler()
 
-        rates_interval = SCHEDULER_SETTINGS.get('rates_interval')
         transfer_relay_interval = SCHEDULER_SETTINGS.get('transfer_relay_interval')
         transfer_confirm_interval = SCHEDULER_SETTINGS.get('transfer_confirm_interval')
         queues_polling_interval = SCHEDULER_SETTINGS.get('queues_polling_interval')
 
-        # Rates updater
-        scheduler.add_job(create_rates_task.send, 'interval', seconds=rates_interval)
         # Token transfer relaying
         scheduler.add_job(select_created_transfers.send, 'interval', seconds=transfer_relay_interval)
         # Token transfer confirmation
@@ -37,10 +34,12 @@ class Command(BaseCommand):
         scheduler.add_job(select_pending_transfer_queue.send, 'interval', seconds=queues_polling_interval)
 
         if not FIAT_ONLY_MODE:
+            rates_interval = SCHEDULER_SETTINGS.get('rates_interval')
             withdrawals_polling_interval = SCHEDULER_SETTINGS.get('withdrawals_polling_interval')
             withdrawal_cycles_polling_interval = SCHEDULER_SETTINGS.get('withdrawal_cycles_polling_interval')
             withdrawals_confirm_interval = SCHEDULER_SETTINGS.get('withdrawals_confirm_interval')
-
+            # Rates updater
+            scheduler.add_job(create_rates_task.send, 'interval', seconds=rates_interval)
             # Withdraw creation
             scheduler.add_job(select_processing_withdrawals.send, 'interval', seconds=withdrawals_polling_interval)
             # Withdraw confirmation

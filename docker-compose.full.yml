@@ -6,6 +6,10 @@ services:
     env_file: .env
     volumes:
       - ./.docker/postgres-data:/var/lib/postgresql/data
+  rabbitmq:
+    image: rabbitmq:3.8-management-alpine
+    restart: unless-stopped
+    env_file: .env
   web:
     restart: unless-stopped
     image: ghcr.io/ducatusx/gold_crowdsale_backend:master
@@ -20,6 +24,33 @@ services:
     volumes:
       - .:/code
     command: bash -c "python manage.py runserver 0.0.0.0:8000"
+  scanner:
+    restart: unless-stopped
+    image: ghcr.io/ducatusx/gold_crowdsale_backend:master
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    depends_on:
+      - db
+      - rabbitmq
+    volumes:
+      - ./scanner/settings:/code/scanner/settings
+      - ./scanner/block_numbers:/code/scanner/block_numbers
+    command: bash -c 'python scanner/main.py'
+  receiver:
+    restart: unless-stopped
+    image: ghcr.io/ducatusx/gold_crowdsale_backend:master
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    depends_on:
+      - db
+      - rabbitmq
+    volumes:
+      - .:/code
+    command: bash -c 'python receiver.py'
   dramatiq:
     restart: unless-stopped
     image: ghcr.io/ducatusx/gold_crowdsale_backend:master

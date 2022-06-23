@@ -219,10 +219,9 @@ DEFAULT_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
 with open(os.path.join(BASE_DIR, 'config.yaml')) as f:
     config_data = yaml.safe_load(f)
 
-ROOT_KEYS = config_data.get('root_keys', None)
+
 CONFIG_NETWORKS = config_data.get('networks', None)
 GOLD_TOKEN_ADDRESS = config_data.get('gold_token_address', None)
-RATES_SETTINGS = config_data.get('rates_settings', None)
 
 NETWORKS = {}
 for net, value in CONFIG_NETWORKS.items():
@@ -232,3 +231,7 @@ for net, value in CONFIG_NETWORKS.items():
 
 SCHEDULER_SETTINGS = config_data.get('scheduler_settings', None)
 FIAT_ONLY_MODE = config_data.get('fiat_only_mode', True)
+
+if not FIAT_ONLY_MODE:
+    ROOT_KEYS = config_data.get('root_keys', None)
+    RATES_SETTINGS = config_data.get('rates_settings', None)
